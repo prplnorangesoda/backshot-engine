@@ -1,7 +1,7 @@
 use std::{thread, time::Duration};
 
 use render::Render;
-use sdl2::keyboard::Keycode;
+use sdl2::{event::WindowEvent, keyboard::Keycode};
 
 mod render;
 mod vector3;
@@ -56,10 +56,16 @@ fn main() {
     let window = video_ctx
         .window("SDL", 800, 600)
         .position_centered()
+        .resizable()
         .opengl()
         .build()
         .unwrap();
+
     gl::load_with(|s| video_ctx.gl_get_proc_address(s).cast());
+
+    unsafe {
+        gl::Viewport(0, 0, 800, 600);
+    }
 
     let gl_ctx = window.gl_create_context().unwrap();
     let mut render_ctx = Render::init(&gl_ctx);
@@ -71,39 +77,27 @@ fn main() {
     world.add_tri(TriangleMesh(
         // Left
         Vertex {
-            pos: Vector3 {
-                x: -0.5,
-                y: -0.5,
-                z: 0.0,
-            },
+            pos: Vector3::xyz(-0.5, -0.5, 0.0),
         },
         // Right
         Vertex {
-            pos: Vector3 {
-                x: 0.5,
-                y: -0.5,
-                z: 0.0,
-            },
+            pos: Vector3::xyz(0.5, -0.5, 0.0),
         },
         // Up
         Vertex {
-            pos: Vector3 {
-                x: 0.0,
-                y: 0.5,
-                z: 0.0,
-            },
+            pos: Vector3::xyz(-0.5, 0.5, 0.0),
         },
     ));
 
     world.add_tri(TriangleMesh(
         Vertex {
-            pos: Vector3::xyz(0.5, -0.7, 0.2),
+            pos: Vector3::xyz(0.5, -0.5, 0.0),
         },
         Vertex {
-            pos: Vector3::xyz(0.6, -0.5, 0.2),
+            pos: Vector3::xyz(0.5, 0.5, 0.0),
         },
         Vertex {
-            pos: Vector3::xyz(-0.2, -0.8, 0.2),
+            pos: Vector3::xyz(-0.5, 0.5, 0.0),
         },
     ));
 
@@ -118,6 +112,13 @@ fn main() {
                 } => {
                     break 'going;
                 }
+                Ev::Window {
+                    timestamp,
+                    window_id,
+                    win_event: WindowEvent::Resized(width, height),
+                } => unsafe {
+                    gl::Viewport(0, 0, width, height);
+                },
                 _ => {}
             }
         }

@@ -1,7 +1,6 @@
 use std::{
-    ffi::{CStr, CString},
-    ops::Deref,
-    ptr::{null, null_mut},
+    ffi::{c_void, CStr, CString},
+    ptr::null,
 };
 
 use gl::types as gltype;
@@ -100,10 +99,19 @@ impl Render {
                 3,
                 gl::DOUBLE,
                 gl::FALSE,
-                (3 * std::mem::size_of::<f64>()).try_into().unwrap(),
+                (6 * std::mem::size_of::<f64>()).try_into().unwrap(),
                 null(),
             );
             gl::EnableVertexAttribArray(0);
+            gl::VertexAttribPointer(
+                1,
+                3,
+                gl::DOUBLE,
+                gl::FALSE,
+                (6 * std::mem::size_of::<f64>()).try_into().unwrap(),
+                (3 * std::mem::size_of::<f64>()) as *const _,
+            );
+            gl::EnableVertexAttribArray(1);
 
             let vert_shader = gl::CreateShader(gl::VERTEX_SHADER);
             compile_shader(vert_shader, VERT_SHADER_SOURCE).unwrap();
@@ -122,13 +130,20 @@ impl Render {
     }
 
     pub fn render_world(&mut self, world: &WorldMesh) -> Result<(), ()> {
-        let mut vertex_arr: Vec<f64> = Vec::with_capacity(world.triangles.len());
+        let mut vertex_arr: Vec<f64> = Vec::with_capacity(world.triangles.len() * 9);
         dbg!(&world);
+        let mut value = 1.0;
         for tri in world.triangles.iter() {
             let tri = tri.clone();
+            value -= 0.05;
             push_vertex_to_vec!(vertex_arr, tri.0);
+            vertex_arr.extend_from_slice(&[value; 3]);
+            value -= 0.05;
             push_vertex_to_vec!(vertex_arr, tri.1);
+            vertex_arr.extend_from_slice(&[value; 3]);
+            value -= 0.05;
             push_vertex_to_vec!(vertex_arr, tri.2);
+            vertex_arr.extend_from_slice(&[value; 3]);
         }
         dbg!(&vertex_arr);
         unsafe {
