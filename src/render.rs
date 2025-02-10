@@ -123,6 +123,7 @@ impl Render {
 
             gl::BindBuffer(gl::ARRAY_BUFFER, 0);
             gl::BindVertexArray(0);
+            gl::PolygonMode(gl::FRONT_AND_BACK, gl::LINE);
             (vao, vbo, program)
         };
 
