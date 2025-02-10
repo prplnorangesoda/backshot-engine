@@ -1,10 +1,31 @@
+use std::{thread, time::Duration};
+
 use sdl2::keyboard::Keycode;
 
 mod vertex;
 
-struct World {
+#[derive(Default)]
+struct WorldMesh {
     triangles: Vec<vertex::TriangleMesh>,
 }
+
+impl WorldMesh {
+    fn add_tri(&mut self, tri: vertex::TriangleMesh) {
+        self.triangles.push(tri);
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Vector3 {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
+struct Camera {
+    pos: Vector3,
+    orientation: Vector3,
+}
+
 fn main() {
     let sdl_ctx = sdl2::init().unwrap();
 
@@ -18,7 +39,8 @@ fn main() {
         .forward_compatible()
         .debug()
         .set();
-    video_ctx.gl_attr().set_context_version(3, 3);
+    video_ctx.gl_attr().set_context_major_version(3);
+    video_ctx.gl_attr().set_context_minor_version(3);
     let window = video_ctx
         .window("SDL", 800, 600)
         .position_centered()
@@ -30,6 +52,8 @@ fn main() {
     let gl_ctx = window.gl_create_context().unwrap();
 
     let mut event_pump = sdl_ctx.event_pump().unwrap();
+
+    let mut _world = WorldMesh::default();
 
     'going: loop {
         for event in event_pump.poll_iter() {
@@ -53,8 +77,8 @@ fn main() {
             render_ui();
         }
         window.gl_swap_window();
+        thread::sleep(Duration::from_millis(100));
     }
-    println!("Hello, world!");
 }
 
 fn render_world() {
