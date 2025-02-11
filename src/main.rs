@@ -3,11 +3,15 @@ use std::{thread, time::Duration};
 use render::Render;
 use sdl2::{event::WindowEvent, keyboard::Keycode};
 
+#[macro_use]
+mod program;
 mod render;
+mod render_vec;
+mod shader;
 mod vector3;
 mod vertex;
 
-use vector3::Vector3;
+use vector3::Vector3_32;
 use vertex::{TriangleMesh, Vertex};
 
 #[derive(Default, Debug)]
@@ -22,18 +26,18 @@ impl WorldMesh {
 }
 
 struct Camera {
-    pos: Vector3,
+    pos: Vector3_32,
     /// XYZ Euler angles. (0,0,0) means upwards.
     /// X: Roll
     /// Y: Pitch
     /// Z: Yaw
-    orientation: Vector3,
+    orientation: Vector3_32,
 }
 
 impl Default for Camera {
     fn default() -> Self {
         Self {
-            orientation: Vector3::xyz(-90.0, 0.0, 0.0),
+            orientation: Vector3_32::xyz(-90.0, 0.0, 0.0),
             pos: Default::default(),
         }
     }
@@ -77,27 +81,27 @@ fn main() {
     world.add_tri(TriangleMesh(
         // Left
         Vertex {
-            pos: Vector3::xyz(-0.5, -0.5, 0.0),
+            pos: Vector3_32::xyz(-0.5, -0.5, 0.0),
         },
         // Right
         Vertex {
-            pos: Vector3::xyz(0.5, -0.5, 0.0),
+            pos: Vector3_32::xyz(0.5, -0.5, 0.0),
         },
         // Up
         Vertex {
-            pos: Vector3::xyz(-0.5, 0.5, 0.0),
+            pos: Vector3_32::xyz(-0.5, 0.5, 0.0),
         },
     ));
 
     world.add_tri(TriangleMesh(
         Vertex {
-            pos: Vector3::xyz(0.5, -0.5, 0.0),
+            pos: Vector3_32::xyz(0.5, -0.5, 0.0),
         },
         Vertex {
-            pos: Vector3::xyz(0.5, 0.5, 0.0),
+            pos: Vector3_32::xyz(0.5, 0.5, 0.0),
         },
         Vertex {
-            pos: Vector3::xyz(-0.5, 0.5, 0.0),
+            pos: Vector3_32::xyz(-0.5, 0.5, 0.0),
         },
     ));
 
