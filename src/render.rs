@@ -1,3 +1,4 @@
+use core::fmt;
 use std::{
     ffi::{c_void, CStr, CString},
     ptr::null,
@@ -8,9 +9,9 @@ use sdl2::video::GLContext;
 
 use crate::{
     program::Program,
-    render_vec::{GlLayout, RenderVec},
+    render_vec::{BoxedBytes, GlLayout, RenderVec},
     shader::Shader,
-    vector3::Vector3_32,
+    vector3::{from_byte_slice, Vector3_32},
     WorldMesh,
 };
 
@@ -54,15 +55,15 @@ pub struct InputParams {
 }
 
 unsafe impl GlLayout for InputParams {
-    fn as_gl_bytes(&self) -> Box<[u8]> {
+    fn as_gl_bytes(&self) -> BoxedBytes {
         let box_1 = self.position.as_gl_bytes();
         let box_2 = self.color.as_gl_bytes();
-        let mut vec = Vec::with_capacity(box_1.len() + box_2.len());
-        vec.extend_from_slice(&box_1);
-        vec.extend_from_slice(&box_2);
+        let mut vec = Vec::with_capacity(box_1.0.len() + box_2.0.len());
+        vec.extend_from_slice(&box_1.0);
+        vec.extend_from_slice(&box_2.0);
+        dbg!(from_byte_slice(&vec));
         let ret = vec.into_boxed_slice();
-
-        println!("InputParams as_gl_bytes() box: {ret:?}");
+        let ret = BoxedBytes(ret);
         ret
     }
     fn gl_type_layout() -> Box<[crate::render_vec::GlType]> {
@@ -73,7 +74,7 @@ unsafe impl GlLayout for InputParams {
         vec.extend_from_slice(&box_2);
         let ret = vec.into_boxed_slice();
 
-        println!("InputParams gl_type_layout() box: {ret:?}");
+        println!("InputParams gl_type_layout() box: {ret:#?}");
         ret
     }
 }
@@ -100,22 +101,38 @@ impl Render {
 
             gl::BufferData(gl::ARRAY_BUFFER, 0, null(), gl::DYNAMIC_DRAW);
 
+            // gl::VertexAttribPointer(
+            //     0,
+            //     3,
+            //     gl::DOUBLE,
+            //     gl::FALSE,
+            //     (6 * std::mem::size_of::<f64>()).try_into().unwrap(),
+            //     null(),
+            // );
             gl::VertexAttribPointer(
                 0,
                 3,
-                gl::DOUBLE,
+                gl::FLOAT,
                 gl::FALSE,
-                (6 * std::mem::size_of::<f64>()).try_into().unwrap(),
+                (6 * std::mem::size_of::<f32>()).try_into().unwrap(),
                 null(),
             );
             gl::EnableVertexAttribArray(0);
+            // gl::VertexAttribPointer(
+            //     1,
+            //     3,
+            //     gl::DOUBLE,
+            //     gl::FALSE,
+            //     (6 * std::mem::size_of::<f32>()).try_into().unwrap(),
+            //     (3 * std::mem::size_of::<f32>()) as *const _,
+            // );
             gl::VertexAttribPointer(
                 1,
                 3,
-                gl::DOUBLE,
+                gl::FLOAT,
                 gl::FALSE,
-                (6 * std::mem::size_of::<f64>()).try_into().unwrap(),
-                (3 * std::mem::size_of::<f64>()) as *const _,
+                (6 * std::mem::size_of::<f32>()).try_into().unwrap(),
+                (3 * std::mem::size_of::<f32>()) as *const _,
             );
             gl::EnableVertexAttribArray(1);
 
@@ -158,12 +175,20 @@ impl Render {
         //     push_vertex_to_vec!(vertex_arr, tri.2);
         //     vertex_arr.extend_from_slice(&colors);
         // }
-        let colors = [0.584, 0.203, 0.92];
+        let color = Vector3_32::xyz(0.584, 0.203, 0.92);
         for tri in world.triangles.iter() {
             let tri = tri.clone();
             render_vec.push(InputParams {
                 position: tri.0.pos,
-                color: colors.into(),
+                color,
+            });
+            render_vec.push(InputParams {
+                position: tri.1.pos,
+                color,
+            });
+            render_vec.push(InputParams {
+                position: tri.2.pos,
+                color,
             });
         }
         // dbg!(&vertex_arr);
@@ -179,18 +204,36 @@ impl Render {
             // );
             gl::NamedBufferData(
                 self.vbo,
-                render_vec.gl_size(),
+                render_vec.gl_byte_size(),
                 render_vec.gl_data(),
                 gl::DYNAMIC_DRAW,
             );
             let slice: &[f32] = std::slice::from_raw_parts(
                 render_vec.gl_data().cast(),
-                render_vec.gl_size().try_into().unwrap(),
+                TryInto::<usize>::try_into(render_vec.gl_byte_size()).unwrap()
+                    / std::mem::size_of::<f32>(),
             );
-            println!("slice for rendering: {slice:?}");
-            println!("Error (pre_drawarrays): {}", gl::GetError());
+            if cfg!(debug_assertions) {
+                println!("slice for rendering: [");
+                let mut iter = slice.chunks(3);
+                let mut vertex_idx = 0;
+                while let Some(pos) = iter.next() {
+                    let col = iter.next().unwrap();
+                    let byte_offset_idx = vertex_idx * (4 * size_of::<f32>());
+                    println!("vertex {vertex_idx:>2} (offset {byte_offset_idx:>4}): position: {pos: >16?}, colour: {col: >16?}");
+                    vertex_idx += 1;
+                }
+                println!("]");
+            }
+            println!(
+                "Error (pre_drawarrays): {}",
+                gl::GetError() == gl::TRUE.into()
+            );
             gl::DrawArrays(gl::TRIANGLES, 0, render_vec.gl_len());
-            println!("Error (post_drawarrays): {}", gl::GetError());
+            println!(
+                "Error (post_drawarrays): {}",
+                gl::GetError() == gl::TRUE.into()
+            );
         }
         Ok(())
     }

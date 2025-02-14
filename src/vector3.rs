@@ -1,4 +1,6 @@
-use crate::render_vec::{GlLayout, GlType};
+use core::fmt;
+
+use crate::render_vec::{BoxedBytes, GlLayout, GlType};
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct Vector3_32 {
@@ -24,21 +26,29 @@ impl From<[f32; 3]> for Vector3_32 {
     }
 }
 
-fn to_byte_slice<'a>(floats: &'a [f32]) -> &'a [u8] {
+pub fn to_byte_slice<'a>(floats: &'a [f32]) -> &'a [u8] {
     unsafe { std::slice::from_raw_parts(floats.as_ptr() as *const _, floats.len() * 4) }
 }
 
+pub fn from_byte_slice<'a>(bytes: &'a [u8]) -> &'a [f32] {
+    unsafe { std::slice::from_raw_parts(bytes.as_ptr() as *const _, bytes.len() / 4) }
+}
+
 unsafe impl GlLayout for Vector3_32 {
-    fn as_gl_bytes(&self) -> Box<[u8]> {
+    fn as_gl_bytes(&self) -> BoxedBytes {
         let out = {
-            let slice = [self.x, self.y, self.z];
+            let slice = dbg!([self.x, self.y, self.z]);
 
             let res = to_byte_slice(&slice);
+            // println!("{:08b}", BoxedBytes(res.into()));
+            let slice_2 = from_byte_slice(res);
+            assert_eq!(slice, slice_2);
             let mut out = Vec::new();
             out.extend_from_slice(res);
+            assert_eq!(slice.len() * 4, res.len());
             out.into_boxed_slice()
         };
-        out
+        BoxedBytes(out)
     }
     fn gl_type_layout() -> Box<[GlType]> {
         Box::new([GlType::Float, GlType::Float, GlType::Float])

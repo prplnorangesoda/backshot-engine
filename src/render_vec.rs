@@ -1,12 +1,30 @@
-use std::{ffi::c_void, marker::PhantomData};
+use core::fmt;
+use std::{ffi::c_void, marker::PhantomData, ops::Deref};
 
+#[derive(Debug)]
+pub struct BoxedBytes(pub Box<[u8]>);
+
+impl Deref for BoxedBytes {
+    type Target = [u8];
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl fmt::Binary for BoxedBytes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let iter = self.0.iter().map(|byte| format!("{:08b}", byte));
+        f.write_str("BoxedBytes ")?;
+        f.debug_list().entries(iter).finish()
+    }
+}
 ///
 /// # Safety
 /// You must ensure that as_gl_types and gl_type_layout match each other in terms of byte layout.
 pub unsafe trait GlLayout {
     fn gl_type_layout() -> Box<[GlType]>;
 
-    fn as_gl_bytes(&self) -> Box<[u8]>;
+    fn as_gl_bytes(&self) -> BoxedBytes;
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -48,7 +66,9 @@ impl<T: GlLayout> RenderVec<T> {
         }
     }
     pub fn push(&mut self, value: T) {
+        dbg!("render_vec: pushing");
         self.inner.extend_from_slice(&value.as_gl_bytes());
+        // dbg!(&self.inner);
     }
     pub fn extend_from_slice(&mut self, slice: &[T]) {
         self.inner.reserve(slice.len() * self.stride);
@@ -59,11 +79,11 @@ impl<T: GlLayout> RenderVec<T> {
     pub fn stride(&self) -> usize {
         self.stride
     }
-    pub fn gl_size(&self) -> isize {
-        (self.inner.len()).try_into().unwrap()
+    pub fn gl_byte_size(&self) -> isize {
+        dbg!(self.inner.len()).try_into().unwrap()
     }
     pub fn gl_len(&self) -> i32 {
-        (self.inner.len() / self.stride).try_into().unwrap()
+        dbg!(self.inner.len() / self.stride).try_into().unwrap()
     }
     pub fn gl_data(&self) -> *const c_void {
         self.inner.as_ptr().cast()
