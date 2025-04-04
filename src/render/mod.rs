@@ -4,16 +4,18 @@ use std::{
     ptr::null,
 };
 
+pub mod render_vec;
+
 use gl::types as gltype;
 use sdl2::video::GLContext;
 
 use crate::{
-    program::Program,
-    render_vec::{BoxedBytes, GlLayout, RenderVec},
-    shader::Shader,
+    gl_wrappers::program::Program,
+    gl_wrappers::shader::Shader,
     vector3::{from_byte_slice, Vector3_32},
-    WorldMesh,
+    ScreenSpaceMesh,
 };
+use render_vec::{BoxedBytes, GlLayout, RenderVec};
 
 pub struct Render {
     vbo: gltype::GLuint,
@@ -34,8 +36,8 @@ macro_rules! include_cstr {
     }};
 }
 
-const FRAG_SHADER_SOURCE: &CStr = include_cstr!("../glsl/frag_shader.glsl");
-const VERT_SHADER_SOURCE: &CStr = include_cstr!("../glsl/vert_shader.glsl");
+const FRAG_SHADER_SOURCE: &CStr = include_cstr!("../../glsl/frag_shader.glsl");
+const VERT_SHADER_SOURCE: &CStr = include_cstr!("../../glsl/vert_shader.glsl");
 
 static mut INITIALIZED_ALREADY: bool = false;
 
@@ -63,10 +65,9 @@ unsafe impl GlLayout for InputParams {
         vec.extend_from_slice(&box_2.0);
         dbg!(from_byte_slice(&vec));
         let ret = vec.into_boxed_slice();
-        let ret = BoxedBytes(ret);
-        ret
+        BoxedBytes(ret)
     }
-    fn gl_type_layout() -> Box<[crate::render_vec::GlType]> {
+    fn gl_type_layout() -> Box<[crate::render::render_vec::GlType]> {
         let box_1 = Vector3_32::gl_type_layout();
         let box_2 = Vector3_32::gl_type_layout();
         let mut vec = Vec::with_capacity(box_1.len() + box_2.len());
@@ -161,7 +162,7 @@ impl Render {
         Render { vao, vbo, program }
     }
 
-    pub fn render_world(&mut self, world: &WorldMesh) -> Result<(), ()> {
+    pub fn render_world(&mut self, world: &ScreenSpaceMesh) -> Result<(), ()> {
         let mut render_vec: RenderVec<InputParams> = RenderVec::new();
         // let mut vertex_arr: Vec<f64> = Vec::with_capacity(world.triangles.len() * 9);
         // dbg!(&world);

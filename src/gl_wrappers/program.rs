@@ -1,6 +1,6 @@
 use std::ffi::CString;
 
-use crate::shader::{CompiledShader, Shader};
+use super::shader::{CompiledShader, Shader};
 
 pub struct Program {
     inner: gl::types::GLuint,
@@ -18,7 +18,7 @@ macro_rules! construct_program {
         compile_error!("Not implemented");
     };
     ($vert_sh:expr, $frag_shader:expr; $($any_extra_shader:expr),*) => {{
-        let args = crate::program::ProgramArgs {
+        let args = crate::gl_wrappers::program::ProgramArgs {
             vert_shader: &$vert_sh,
             geo_shader: None,
             frag_shader: &$frag_shader,

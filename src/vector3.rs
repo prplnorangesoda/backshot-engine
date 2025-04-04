@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::render_vec::{BoxedBytes, GlLayout, GlType};
+use crate::render::render_vec::{BoxedBytes, GlLayout, GlType};
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct Vector3_32 {
@@ -26,11 +26,11 @@ impl From<[f32; 3]> for Vector3_32 {
     }
 }
 
-pub fn to_byte_slice<'a>(floats: &'a [f32]) -> &'a [u8] {
+pub fn to_byte_slice(floats: &[f32]) -> &[u8] {
     unsafe { std::slice::from_raw_parts(floats.as_ptr() as *const _, floats.len() * 4) }
 }
 
-pub fn from_byte_slice<'a>(bytes: &'a [u8]) -> &'a [f32] {
+pub fn from_byte_slice(bytes: &[u8]) -> &[f32] {
     unsafe { std::slice::from_raw_parts(bytes.as_ptr() as *const _, bytes.len() / 4) }
 }
 

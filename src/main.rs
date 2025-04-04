@@ -3,25 +3,30 @@ use std::{thread, time::Duration};
 use render::Render;
 use sdl2::{event::WindowEvent, keyboard::Keycode};
 
+mod brush;
+mod entity;
 #[macro_use]
-mod program;
+mod gl_wrappers;
 mod render;
-mod render_vec;
-mod shader;
 mod vector3;
 mod vertex;
+mod world;
 
 use vector3::Vector3_32;
 use vertex::{TriangleMesh, Vertex};
+use world::World;
 
 #[derive(Default, Debug)]
-struct WorldMesh {
+struct ScreenSpaceMesh {
     triangles: Vec<vertex::TriangleMesh>,
 }
 
-impl WorldMesh {
+impl ScreenSpaceMesh {
     fn add_tri(&mut self, tri: vertex::TriangleMesh) {
         self.triangles.push(tri);
+    }
+    fn clear(&mut self) {
+        self.triangles.clear();
     }
 }
 
@@ -76,9 +81,10 @@ fn main() {
 
     let mut event_pump = sdl_ctx.event_pump().unwrap();
 
-    let mut world = WorldMesh::default();
+    let mut _world = World::new();
+    let mut screen_world = ScreenSpaceMesh::default();
     let mut _camera = Camera::default();
-    world.add_tri(TriangleMesh(
+    screen_world.add_tri(TriangleMesh(
         // Left
         Vertex {
             pos: Vector3_32::xyz(-0.5, -0.5, 0.0),
@@ -93,7 +99,7 @@ fn main() {
         },
     ));
 
-    world.add_tri(TriangleMesh(
+    screen_world.add_tri(TriangleMesh(
         Vertex {
             pos: Vector3_32::xyz(0.5, -0.5, 0.0),
         },
@@ -130,7 +136,7 @@ fn main() {
         unsafe {
             gl::ClearColor(0.2, 0.2, 0.3, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
-            render_ctx.render_world(&world).unwrap();
+            render_ctx.render_world(&screen_world).unwrap();
             render_ui();
         }
         window.gl_swap_window();
