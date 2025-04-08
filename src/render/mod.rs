@@ -1,6 +1,5 @@
-use core::fmt;
 use std::{
-    ffi::{c_void, CStr, CString},
+    ffi::{CStr, CString},
     ptr::null,
 };
 
@@ -10,9 +9,7 @@ use gl::types as gltype;
 use sdl2::video::GLContext;
 
 use crate::{
-    gl_wrappers::program::Program,
-    gl_wrappers::shader::Shader,
-    vector3::{from_byte_slice, Vector3_32},
+    gl_wrappers::program::Program, gl_wrappers::shader::Shader, vector3::Vector3_32,
     ScreenSpaceMesh,
 };
 use render_vec::{BoxedBytes, GlLayout, RenderVec};
@@ -63,7 +60,7 @@ unsafe impl GlLayout for InputParams {
         let mut vec = Vec::with_capacity(box_1.0.len() + box_2.0.len());
         vec.extend_from_slice(&box_1.0);
         vec.extend_from_slice(&box_2.0);
-        dbg!(from_byte_slice(&vec));
+        // dbg!(from_byte_slice(&vec));
         let ret = vec.into_boxed_slice();
         BoxedBytes(ret)
     }
@@ -75,7 +72,7 @@ unsafe impl GlLayout for InputParams {
         vec.extend_from_slice(&box_2);
         let ret = vec.into_boxed_slice();
 
-        println!("InputParams gl_type_layout() box: {ret:#?}");
+        println!("InputParams gl_type_layout() box: {ret:?}");
         ret
     }
 }
@@ -176,7 +173,7 @@ impl Render {
         //     push_vertex_to_vec!(vertex_arr, tri.2);
         //     vertex_arr.extend_from_slice(&colors);
         // }
-        let color = Vector3_32::xyz(0.584, 0.203, 0.92);
+        let color = Vector3_32::new(0.584, 0.203, 0.92);
         for tri in world.triangles.iter() {
             let tri = tri.clone();
             render_vec.push(InputParams {
@@ -209,23 +206,24 @@ impl Render {
                 render_vec.gl_data(),
                 gl::DYNAMIC_DRAW,
             );
-            let slice: &[f32] = std::slice::from_raw_parts(
-                render_vec.gl_data().cast(),
-                TryInto::<usize>::try_into(render_vec.gl_byte_size()).unwrap()
-                    / std::mem::size_of::<f32>(),
-            );
-            if cfg!(debug_assertions) {
-                println!("slice for rendering: [");
-                let mut iter = slice.chunks(3);
-                let mut vertex_idx = 0;
-                while let Some(pos) = iter.next() {
-                    let col = iter.next().unwrap();
-                    let byte_offset_idx = vertex_idx * (4 * size_of::<f32>());
-                    println!("vertex {vertex_idx:>2} (offset {byte_offset_idx:>4}): position: {pos: >16?}, colour: {col: >16?}");
-                    vertex_idx += 1;
-                }
-                println!("]");
-            }
+
+            // if cfg!(debug_assertions) {
+            //     let slice: &[f32] = std::slice::from_raw_parts(
+            //         render_vec.gl_data().cast(),
+            //         TryInto::<usize>::try_into(render_vec.gl_byte_size()).unwrap()
+            //             / std::mem::size_of::<f32>(),
+            //     );
+            //     println!("slice for rendering: [");
+            //     let mut iter = slice.chunks(3);
+            //     let mut vertex_idx = 0;
+            //     while let Some(pos) = iter.next() {
+            //         let col = iter.next().unwrap();
+            //         let byte_offset_idx = vertex_idx * (4 * size_of::<f32>());
+            //         println!("vertex {vertex_idx:>2} (offset {byte_offset_idx:>4}): position: {pos: >16?}, colour: {col: >16?}");
+            //         vertex_idx += 1;
+            //     }
+            //     println!("]");
+            // }
             println!(
                 "Error (pre_drawarrays): {}",
                 gl::GetError() == gl::TRUE.into()

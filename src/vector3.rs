@@ -2,29 +2,31 @@ use core::fmt;
 
 use crate::render::render_vec::{BoxedBytes, GlLayout, GlType};
 
-#[derive(Default, Debug, Clone, Copy)]
-pub struct Vector3_32 {
-    /// East/West.
-    pub x: f32,
+#[deprecated(note = "Use glm::Vec3 directly")]
+pub type Vector3_32 = glm::Vec3;
+// #[derive(Default, Debug, Clone, Copy)]
+// pub struct Vector3_32 {
+//     /// East/West.
+//     pub x: f32,
 
-    /// Up/Down.
-    pub y: f32,
+//     /// Up/Down.
+//     pub y: f32,
 
-    /// North/South.
-    pub z: f32,
-}
+//     /// North/South.
+//     pub z: f32,
+// }
 
-impl Vector3_32 {
-    pub fn xyz(x: f32, y: f32, z: f32) -> Self {
-        Self { x, y, z }
-    }
-}
+// impl Vector3_32 {
+//     pub fn xyz(x: f32, y: f32, z: f32) -> Self {
+//         Self { x, y, z }
+//     }
+//}
 
-impl From<[f32; 3]> for Vector3_32 {
-    fn from(value: [f32; 3]) -> Self {
-        Self::xyz(value[0], value[1], value[2])
-    }
-}
+// impl From<[f32; 3]> for Vector3_32 {
+//     fn from(value: [f32; 3]) -> Self {
+//         Self::xyz(value[0], value[1], value[2])
+//     }
+// }
 
 pub fn to_byte_slice(floats: &[f32]) -> &[u8] {
     unsafe { std::slice::from_raw_parts(floats.as_ptr() as *const _, floats.len() * 4) }
@@ -50,26 +52,28 @@ unsafe impl GlLayout for Vector3_32 {
     }
 }
 
-#[derive(Default, Debug, Clone, Copy)]
-pub struct Vector3_64 {
-    /// East/West.
-    pub x: f64,
+#[deprecated(note = "Use glm::Vector3<f64> directly")]
+pub type Vector3_64 = glm::Vector3<f64>;
+// #[derive(Default, Debug, Clone, Copy)]
+// pub struct Vector3_64 {
+//     /// East/West.
+//     pub x: f64,
 
-    /// Up/Down.
-    pub y: f64,
+//     /// Up/Down.
+//     pub y: f64,
 
-    /// North/South.
-    pub z: f64,
-}
+//     /// North/South.
+//     pub z: f64,
+// }
 
-impl Vector3_64 {
-    pub fn xyz(x: f64, y: f64, z: f64) -> Self {
-        Self { x, y, z }
-    }
-}
+// impl Vector3_64 {
+//     pub fn xyz(x: f64, y: f64, z: f64) -> Self {
+//         Self { x, y, z }
+//     }
+// }
 
-impl From<[f64; 3]> for Vector3_64 {
-    fn from(value: [f64; 3]) -> Self {
-        Self::xyz(value[0], value[1], value[2])
-    }
-}
+// impl From<[f64; 3]> for Vector3_64 {
+//     fn from(value: [f64; 3]) -> Self {
+//         Self::xyz(value[0], value[1], value[2])
+//     }
+// }

@@ -66,7 +66,7 @@ impl<T: GlLayout> RenderVec<T> {
         }
     }
     pub fn push(&mut self, value: T) {
-        dbg!("render_vec: pushing");
+        // dbg!("render_vec: pushing");
         self.inner.extend_from_slice(&value.as_gl_bytes());
         // dbg!(&self.inner);
     }
@@ -80,10 +80,10 @@ impl<T: GlLayout> RenderVec<T> {
         self.stride
     }
     pub fn gl_byte_size(&self) -> isize {
-        dbg!(self.inner.len()).try_into().unwrap()
+        self.inner.len().try_into().unwrap()
     }
     pub fn gl_len(&self) -> i32 {
-        dbg!(self.inner.len() / self.stride).try_into().unwrap()
+        (self.inner.len() / self.stride).try_into().unwrap()
     }
     pub fn gl_data(&self) -> *const c_void {
         self.inner.as_ptr().cast()

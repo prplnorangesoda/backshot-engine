@@ -42,8 +42,8 @@ struct Camera {
 impl Default for Camera {
     fn default() -> Self {
         Self {
-            orientation: Vector3_32::xyz(-90.0, 0.0, 0.0),
-            pos: Default::default(),
+            orientation: glm::vec3(-90.0, 0.0, 0.0),
+            pos: glm::to_vec3(0.),
         }
     }
 }
@@ -87,27 +87,27 @@ fn main() {
     screen_world.add_tri(TriangleMesh(
         // Left
         Vertex {
-            pos: Vector3_32::xyz(-0.5, -0.5, 0.0),
+            pos: glm::vec3(-0.5, -0.5, 0.0),
         },
         // Right
         Vertex {
-            pos: Vector3_32::xyz(0.5, -0.5, 0.0),
+            pos: glm::vec3(0.5, -0.5, 0.0),
         },
         // Up
         Vertex {
-            pos: Vector3_32::xyz(-0.5, 0.5, 0.0),
+            pos: glm::vec3(-0.5, 0.5, 0.0),
         },
     ));
 
     screen_world.add_tri(TriangleMesh(
         Vertex {
-            pos: Vector3_32::xyz(0.5, -0.5, 0.0),
+            pos: glm::vec3(0.5, -0.5, 0.0),
         },
         Vertex {
-            pos: Vector3_32::xyz(0.5, 0.5, 0.0),
+            pos: glm::vec3(0.5, 0.5, 0.0),
         },
         Vertex {
-            pos: Vector3_32::xyz(-0.5, 0.5, 0.0),
+            pos: glm::vec3(-0.5, 0.5, 0.0),
         },
     ));
 

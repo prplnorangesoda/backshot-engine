@@ -5,4 +5,5 @@
 
 [dependencies]
   gl    = "0.14.0"
+glm = "0.2.3"
   sdl2  = { version = "0.37.0", features = ["ttf"] }

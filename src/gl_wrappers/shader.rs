@@ -1,7 +1,4 @@
-use std::{
-    ffi::{CStr, CString},
-    ptr::null,
-};
+use std::{ffi::CString, ptr::null};
 
 pub struct Shader {
     inner: gl::types::GLuint,
@@ -11,7 +8,7 @@ pub struct Shader {
 
 pub enum ShaderType {
     Fragment,
-    Geometry,
+    _Geometry,
     Vertex,
 }
 
@@ -20,7 +17,7 @@ impl Shader {
         let shader = unsafe {
             match shader_type {
                 ShaderType::Fragment => gl::CreateShader(gl::FRAGMENT_SHADER),
-                ShaderType::Geometry => gl::CreateShader(gl::GEOMETRY_SHADER),
+                ShaderType::_Geometry => gl::CreateShader(gl::GEOMETRY_SHADER),
                 ShaderType::Vertex => gl::CreateShader(gl::VERTEX_SHADER),
             }
         };
@@ -37,7 +34,7 @@ impl Shader {
         Self::new(ShaderType::Fragment, source)
     }
     pub fn geometry(source: CString) -> Self {
-        Self::new(ShaderType::Geometry, source)
+        Self::new(ShaderType::_Geometry, source)
     }
 
     pub fn compile(mut self) -> Result<CompiledShader, String> {
