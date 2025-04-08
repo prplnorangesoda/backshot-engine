@@ -75,20 +75,20 @@ impl Drop for Shader {
 impl Drop for CompiledShader {
     fn drop(&mut self) {
         unsafe {
-            gl::DeleteShader(self.inner);
+            gl::DeleteShader(self.id);
         };
     }
 }
 
 pub struct CompiledShader {
-    inner: gl::types::GLuint,
+    id: gl::types::GLuint,
 }
 
 impl CompiledShader {
     pub unsafe fn from_uint_unchecked(shader: gl::types::GLuint) -> Self {
-        Self { inner: shader }
+        Self { id: shader }
     }
-    pub fn get_inner(&self) -> gl::types::GLuint {
-        self.inner
+    pub fn id(&self) -> gl::types::GLuint {
+        self.id
     }
 }

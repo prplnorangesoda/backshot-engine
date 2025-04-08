@@ -37,16 +37,11 @@ pub fn from_byte_slice(bytes: &[u8]) -> &[f32] {
 unsafe impl GlLayout for Vector3_32 {
     fn as_gl_bytes(&self) -> BoxedBytes {
         let out = {
-            let slice = dbg!([self.x, self.y, self.z]);
+            let slice = [self.x, self.y, self.z];
 
             let res = to_byte_slice(&slice);
-            // println!("{:08b}", BoxedBytes(res.into()));
-            let slice_2 = from_byte_slice(res);
-            assert_eq!(slice, slice_2);
-            let mut out = Vec::new();
-            out.extend_from_slice(res);
-            assert_eq!(slice.len() * 4, res.len());
-            out.into_boxed_slice()
+            let owned: Vec<u8> = res.to_owned();
+            owned.into_boxed_slice()
         };
         BoxedBytes(out)
     }

@@ -195,7 +195,7 @@ impl Render {
         // dbg!(&vertex_arr);
         unsafe {
             // let mut arr = vertex_arr.into_boxed_slice();
-            gl::UseProgram(self.program.get_inner());
+            gl::UseProgram(self.program.id());
             gl::BindVertexArray(self.vao);
             // gl::NamedBufferData(
             //     self.vbo,

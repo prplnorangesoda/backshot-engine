@@ -3,7 +3,7 @@ use std::ffi::CString;
 use super::shader::{CompiledShader, Shader};
 
 pub struct Program {
-    inner: gl::types::GLuint,
+    id: gl::types::GLuint,
 }
 
 pub struct ProgramArgs<'a> {
@@ -46,13 +46,13 @@ impl Program {
     pub fn from_args(args: ProgramArgs<'_>) -> Result<Self, String> {
         let inner = unsafe {
             let program = gl::CreateProgram();
-            gl::AttachShader(program, args.vert_shader.get_inner());
-            gl::AttachShader(program, args.frag_shader.get_inner());
+            gl::AttachShader(program, args.vert_shader.id());
+            gl::AttachShader(program, args.frag_shader.id());
             if let Some(shader) = args.geo_shader {
-                gl::AttachShader(program, shader.get_inner());
+                gl::AttachShader(program, shader.id());
             }
             for shader in args.extra_shaders.iter() {
-                gl::AttachShader(program, shader.get_inner());
+                gl::AttachShader(program, shader.id());
             }
             ::gl::LinkProgram(program);
             let mut success = 0;
@@ -71,10 +71,10 @@ impl Program {
             program
         };
 
-        Ok(Self { inner })
+        Ok(Self { id: inner })
     }
 
-    pub fn get_inner(&self) -> gl::types::GLuint {
-        self.inner
+    pub fn id(&self) -> gl::types::GLuint {
+        self.id
     }
 }
