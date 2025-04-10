@@ -1,5 +1,9 @@
-use std::{thread, time::Duration};
+use std::{
+    thread,
+    time::{Duration, SystemTime},
+};
 
+use glm::Vec3;
 use render::Render;
 use sdl2::{event::WindowEvent, keyboard::Keycode};
 
@@ -12,7 +16,6 @@ mod vector3;
 mod vertex;
 mod world;
 
-use vector3::Vector3_32;
 use vertex::{TriangleMesh, Vertex};
 use world::World;
 
@@ -31,12 +34,12 @@ impl ScreenSpaceMesh {
 }
 
 struct Camera {
-    pos: Vector3_32,
+    pos: Vec3,
     /// XYZ Euler angles. (0,0,0) means upwards.
     /// X: Roll
     /// Y: Pitch
     /// Z: Yaw
-    orientation: Vector3_32,
+    orientation: Vec3,
 }
 
 impl Default for Camera {
@@ -70,6 +73,8 @@ fn main() {
         .build()
         .unwrap();
 
+    let main_id = window.id();
+
     gl::load_with(|s| video_ctx.gl_get_proc_address(s).cast());
 
     unsafe {
@@ -99,17 +104,18 @@ fn main() {
         },
     ));
 
-    screen_world.add_tri(TriangleMesh(
-        Vertex {
-            pos: glm::vec3(0.5, -0.5, 0.0),
-        },
-        Vertex {
-            pos: glm::vec3(0.5, 0.5, 0.0),
-        },
-        Vertex {
-            pos: glm::vec3(-0.5, 0.5, 0.0),
-        },
-    ));
+    // screen_world.add_tri(TriangleMesh(
+    //     Vertex {
+    //         pos: glm::vec3(0.5, -0.5, 0.0),
+    //     },
+    //     Vertex {
+    //         pos: glm::vec3(0.5, 0.5, 0.0),
+    //     },
+    //     Vertex {
+    //         pos: glm::vec3(-0.5, 0.5, 0.0),
+    //     },
+    // ));
+    let mut sleep_passed = false;
 
     'going: loop {
         for event in event_pump.poll_iter() {
@@ -126,9 +132,14 @@ fn main() {
                     timestamp,
                     window_id,
                     win_event: WindowEvent::Resized(width, height),
-                } => unsafe {
-                    gl::Viewport(0, 0, width, height);
-                },
+                } if window_id == main_id => {
+                    if sleep_passed {
+                        sleep_passed = false;
+                        unsafe {
+                            gl::Viewport(0, 0, width, height);
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -140,7 +151,15 @@ fn main() {
             render_ui();
         }
         window.gl_swap_window();
+        let now = SystemTime::now();
+        println!(
+            "Now: {}",
+            now.duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+        );
         thread::sleep(Duration::from_millis(100));
+        sleep_passed = true;
     }
 }
 

@@ -1,6 +1,6 @@
 use std::ffi::CString;
 
-use super::shader::{CompiledShader, Shader};
+use super::shader::CompiledShader;
 
 pub struct Program {
     id: gl::types::GLuint,

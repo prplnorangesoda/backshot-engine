@@ -1,17 +1,11 @@
-use std::{
-    ffi::{CStr, CString},
-    ptr::null,
-};
+use std::{ffi::CStr, ptr::null};
 
 pub mod render_vec;
 
 use gl::types as gltype;
 use sdl2::video::GLContext;
 
-use crate::{
-    gl_wrappers::program::Program, gl_wrappers::shader::Shader, vector3::Vector3_32,
-    ScreenSpaceMesh,
-};
+use crate::{gl_wrappers::program::Program, gl_wrappers::shader::Shader, ScreenSpaceMesh};
 use render_vec::{BoxedBytes, GlLayout, RenderVec};
 
 pub struct Render {
@@ -49,8 +43,8 @@ macro_rules! push_vertex_to_vec {
 }
 
 pub struct InputParams {
-    position: Vector3_32,
-    color: Vector3_32,
+    position: glm::Vec3,
+    color: glm::Vec3,
 }
 
 unsafe impl GlLayout for InputParams {
@@ -65,8 +59,8 @@ unsafe impl GlLayout for InputParams {
         BoxedBytes(ret)
     }
     fn gl_type_layout() -> Box<[crate::render::render_vec::GlType]> {
-        let box_1 = Vector3_32::gl_type_layout();
-        let box_2 = Vector3_32::gl_type_layout();
+        let box_1 = glm::Vec3::gl_type_layout();
+        let box_2 = glm::Vec3::gl_type_layout();
         let mut vec = Vec::with_capacity(box_1.len() + box_2.len());
         vec.extend_from_slice(&box_1);
         vec.extend_from_slice(&box_2);
@@ -173,7 +167,7 @@ impl Render {
         //     push_vertex_to_vec!(vertex_arr, tri.2);
         //     vertex_arr.extend_from_slice(&colors);
         // }
-        let color = Vector3_32::new(0.584, 0.203, 0.92);
+        let color = glm::vec3(0.584, 0.203, 0.92);
         for tri in world.triangles.iter() {
             let tri = tri.clone();
             render_vec.push(InputParams {
@@ -238,22 +232,22 @@ impl Render {
     }
 }
 
-pub fn compile_shader(shader: gltype::GLuint, shader_source: &CStr) -> Result<(), String> {
-    unsafe {
-        gl::ShaderSource(shader, 1, &shader_source.as_ptr(), null());
-        gl::CompileShader(shader);
+// pub fn compile_shader(shader: gltype::GLuint, shader_source: &CStr) -> Result<(), String> {
+//     unsafe {
+//         gl::ShaderSource(shader, 1, &shader_source.as_ptr(), null());
+//         gl::CompileShader(shader);
 
-        let mut success = 0;
-        gl::GetShaderiv(shader, gl::COMPILE_STATUS, &mut success);
+//         let mut success = 0;
+//         gl::GetShaderiv(shader, gl::COMPILE_STATUS, &mut success);
 
-        if success != gl::TRUE.into() {
-            let mut infolog: Vec<u8> = vec![0; 512];
-            let mut length = 0;
-            gl::GetShaderInfoLog(shader, 512, &mut length, infolog.as_mut_ptr().cast());
-            infolog.truncate(length.try_into().unwrap());
-            let loggable_string = CString::new(infolog).unwrap().into_string().unwrap();
-            return Err(format!("Internal opengl error: {}", loggable_string));
-        }
-    }
-    Ok(())
-}
+//         if success != gl::TRUE.into() {
+//             let mut infolog: Vec<u8> = vec![0; 512];
+//             let mut length = 0;
+//             gl::GetShaderInfoLog(shader, 512, &mut length, infolog.as_mut_ptr().cast());
+//             infolog.truncate(length.try_into().unwrap());
+//             let loggable_string = CString::new(infolog).unwrap().into_string().unwrap();
+//             return Err(format!("Internal opengl error: {}", loggable_string));
+//         }
+//     }
+//     Ok(())
+// }

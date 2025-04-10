@@ -1,9 +1,5 @@
-use core::fmt;
-
 use crate::render::render_vec::{BoxedBytes, GlLayout, GlType};
 
-#[deprecated(note = "Use glm::Vec3 directly")]
-pub type Vector3_32 = glm::Vec3;
 // #[derive(Default, Debug, Clone, Copy)]
 // pub struct Vector3_32 {
 //     /// East/West.
@@ -36,7 +32,7 @@ pub fn from_byte_slice(bytes: &[u8]) -> &[f32] {
     unsafe { std::slice::from_raw_parts(bytes.as_ptr() as *const _, bytes.len() / 4) }
 }
 
-unsafe impl GlLayout for Vector3_32 {
+unsafe impl GlLayout for glm::Vec3 {
     fn as_gl_bytes(&self) -> BoxedBytes {
         let out = {
             let slice = [self.x, self.y, self.z];
@@ -52,8 +48,6 @@ unsafe impl GlLayout for Vector3_32 {
     }
 }
 
-#[deprecated(note = "Use glm::Vector3<f64> directly")]
-pub type Vector3_64 = glm::Vector3<f64>;
 // #[derive(Default, Debug, Clone, Copy)]
 // pub struct Vector3_64 {
 //     /// East/West.
