@@ -8,33 +8,37 @@ pub struct Shader {
 
 pub enum ShaderType {
     Fragment,
-    _Geometry,
+    Geometry,
     Vertex,
 }
 
 impl Shader {
-    pub fn new(shader_type: ShaderType, source: CString) -> Self {
+    /// Wrap shader source code into a type-safe Rust struct.
+    pub fn new<T: Into<CString>>(shader_type: ShaderType, source: T) -> Self {
         let shader = unsafe {
             match shader_type {
                 ShaderType::Fragment => gl::CreateShader(gl::FRAGMENT_SHADER),
-                ShaderType::_Geometry => gl::CreateShader(gl::GEOMETRY_SHADER),
+                ShaderType::Geometry => gl::CreateShader(gl::GEOMETRY_SHADER),
                 ShaderType::Vertex => gl::CreateShader(gl::VERTEX_SHADER),
             }
         };
         Self {
             inner: shader,
-            source,
+            source: source.into(),
             was_compiled: false,
         }
     }
+    /// Helper function for `Shader::new()` with vertex shaders.
     pub fn vertex(source: CString) -> Self {
         Self::new(ShaderType::Vertex, source)
     }
+    /// Helper function for `Shader::new()` with fragment shaders.
     pub fn fragment(source: CString) -> Self {
         Self::new(ShaderType::Fragment, source)
     }
+    /// Helper function for `Shader::new()` with geo shaders.
     pub fn geometry(source: CString) -> Self {
-        Self::new(ShaderType::_Geometry, source)
+        Self::new(ShaderType::Geometry, source)
     }
 
     pub fn compile(mut self) -> Result<CompiledShader, String> {
@@ -56,6 +60,7 @@ impl Shader {
             self.was_compiled = true;
             self.inner
         };
+        // Safety: we check for
         unsafe { Ok(CompiledShader::from_uint_unchecked(compiled_shader)) }
     }
 }
@@ -82,6 +87,8 @@ pub struct CompiledShader {
 }
 
 impl CompiledShader {
+    /// # Safety
+    /// The uint passed into this function MUST be a uint returned by `gl::CompileShader`.
     pub unsafe fn from_uint_unchecked(shader: gl::types::GLuint) -> Self {
         Self { id: shader }
     }

@@ -1,11 +1,19 @@
-use std::{ffi::CStr, ptr::null};
+use std::{
+    ffi::CStr,
+    ptr::{null, slice_from_raw_parts},
+};
 
 pub mod render_vec;
 
 use gl::types as gltype;
+use glm::Vec3;
 use sdl2::video::GLContext;
 
-use crate::{gl_wrappers::program::Program, gl_wrappers::shader::Shader, ScreenSpaceMesh};
+use crate::{
+    ScreenSpaceMesh,
+    gl_wrappers::{program::Program, shader::Shader},
+    vector3::to_byte_slice,
+};
 use render_vec::{BoxedBytes, GlLayout, RenderVec};
 
 pub struct Render {
@@ -32,41 +40,43 @@ const VERT_SHADER_SOURCE: &CStr = include_cstr!("../../glsl/vert_shader.glsl");
 
 static mut INITIALIZED_ALREADY: bool = false;
 
-macro_rules! push_vertex_to_vec {
-    ($vec:expr, $vert:expr) => {{
-        use ::std::vec::Vec;
-        let vec: &mut Vec<_> = &mut $vec;
-        Vec::push(vec, $vert.pos.x);
-        Vec::push(vec, $vert.pos.y);
-        Vec::push(vec, $vert.pos.z);
-    }};
-}
+// macro_rules! push_vertex_to_vec {
+//     ($vec:expr, $vert:expr) => {{
+//         use ::std::vec::Vec;
+//         let vec: &mut Vec<_> = &mut $vec;
+//         Vec::push(vec, $vert.pos.x);
+//         Vec::push(vec, $vert.pos.y);
+//         Vec::push(vec, $vert.pos.z);
+//     }};
+// }
 
+// If you're adding something, ensure to update
+// the GlLayout impl below!
+#[repr(C)]
 pub struct InputParams {
-    position: glm::Vec3,
-    color: glm::Vec3,
+    position: Vec3,
+    color: Vec3,
 }
 
 unsafe impl GlLayout for InputParams {
-    fn as_gl_bytes(&self) -> BoxedBytes {
-        let box_1 = self.position.as_gl_bytes();
-        let box_2 = self.color.as_gl_bytes();
-        let mut vec = Vec::with_capacity(box_1.0.len() + box_2.0.len());
-        vec.extend_from_slice(&box_1.0);
-        vec.extend_from_slice(&box_2.0);
-        // dbg!(from_byte_slice(&vec));
-        let ret = vec.into_boxed_slice();
-        BoxedBytes(ret)
+    fn as_gl_bytes(&self) -> &[u8] {
+        let ret: &[u8] = unsafe {
+            let floats: &[f32] = slice_from_raw_parts((self as *const InputParams).cast(), 6)
+                .as_ref()
+                .unwrap();
+            to_byte_slice(floats)
+        };
+        ret
     }
     fn gl_type_layout() -> Box<[crate::render::render_vec::GlType]> {
-        let box_1 = glm::Vec3::gl_type_layout();
-        let box_2 = glm::Vec3::gl_type_layout();
+        let box_1 = Vec3::gl_type_layout();
+        let box_2 = Vec3::gl_type_layout();
         let mut vec = Vec::with_capacity(box_1.len() + box_2.len());
         vec.extend_from_slice(&box_1);
         vec.extend_from_slice(&box_2);
         let ret = vec.into_boxed_slice();
 
-        println!("InputParams gl_type_layout() box: {ret:?}");
+        // println!("InputParams gl_type_layout() box: {ret:?}");
         ret
     }
 }
@@ -143,16 +153,24 @@ impl Render {
             let program = construct_program!(vert_shader, frag_shader;).unwrap();
 
             // let program = link_program!(vert_shader, frag_shader).unwrap();
+            gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL);
 
+            // reset bound arrays
             gl::BindBuffer(gl::ARRAY_BUFFER, 0);
             gl::BindVertexArray(0);
-            gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL);
             (vao, vbo, program)
         };
 
         Render { vao, vbo, program }
     }
 
+    pub fn clear(&mut self) -> Result<(), ()> {
+        unsafe {
+            gl::ClearColor(0.2, 0.2, 0.3, 1.0);
+            gl::Clear(gl::COLOR_BUFFER_BIT);
+        }
+        Ok(())
+    }
     pub fn render_world(&mut self, world: &ScreenSpaceMesh) -> Result<(), ()> {
         let mut render_vec: RenderVec<InputParams> = RenderVec::new();
         // let mut vertex_arr: Vec<f64> = Vec::with_capacity(world.triangles.len() * 9);
@@ -218,15 +236,12 @@ impl Render {
             //     }
             //     println!("]");
             // }
-            println!(
-                "Error (pre_drawarrays): {}",
-                gl::GetError() == gl::TRUE.into()
-            );
+            // let error_pre = gl::GetError() == gl::TRUE.into();
             gl::DrawArrays(gl::TRIANGLES, 0, render_vec.gl_len());
-            println!(
-                "Error (post_drawarrays): {}",
-                gl::GetError() == gl::TRUE.into()
-            );
+            let error_post = gl::GetError() == gl::TRUE.into();
+            if error_post {
+                eprintln!("There was an error after gl::DrawArrays !!!");
+            }
         }
         Ok(())
     }

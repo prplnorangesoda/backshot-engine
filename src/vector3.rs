@@ -1,3 +1,5 @@
+use std::ptr::slice_from_raw_parts;
+
 use crate::render::render_vec::{BoxedBytes, GlLayout, GlType};
 
 // #[derive(Default, Debug, Clone, Copy)]
@@ -33,15 +35,17 @@ pub fn from_byte_slice(bytes: &[u8]) -> &[f32] {
 }
 
 unsafe impl GlLayout for glm::Vec3 {
-    fn as_gl_bytes(&self) -> BoxedBytes {
-        let out = {
-            let slice = [self.x, self.y, self.z];
-
-            let res = to_byte_slice(&slice);
-            let owned: Vec<u8> = res.to_owned();
-            owned.into_boxed_slice()
+    fn as_gl_bytes(&self) -> &[u8] {
+        // SAFETY:
+        // glm::Vec3 is repr(C), meaning it's laid out in memory
+        // exactly the same as an array of F32s.
+        let slice: &[f32] = unsafe {
+            slice_from_raw_parts((self as *const glm::Vec3).cast(), 3)
+                .as_ref()
+                .unwrap()
         };
-        BoxedBytes(out)
+
+        to_byte_slice(&slice)
     }
     fn gl_type_layout() -> Box<[GlType]> {
         Box::new([GlType::Float, GlType::Float, GlType::Float])

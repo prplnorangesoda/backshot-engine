@@ -21,10 +21,11 @@ impl fmt::Binary for BoxedBytes {
 ///
 /// # Safety
 /// You must ensure that as_gl_types and gl_type_layout match each other in terms of byte layout.
+/// `If gl_type_layout()` returns Float, Float, Float, `as_gl_bytes` must return a slice of 3 f32s.
 pub unsafe trait GlLayout {
     fn gl_type_layout() -> Box<[GlType]>;
 
-    fn as_gl_bytes(&self) -> BoxedBytes;
+    fn as_gl_bytes(&self) -> &[u8];
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -57,7 +58,7 @@ impl<T: GlLayout> RenderVec<T> {
         for gl_type in layout.iter() {
             stride += gl_type.get_size();
         }
-        println!("RenderVec stride: {stride}");
+        // eprintln!("New RenderVec created, stride: {stride}");
         Self {
             inner: vec![],
             layout,

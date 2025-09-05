@@ -1,6 +1,7 @@
+#![allow(dead_code, clippy::let_and_return)]
 use std::{
     thread,
-    time::{Duration, SystemTime},
+    time::{Duration, Instant},
 };
 
 use glm::Vec3;
@@ -19,6 +20,16 @@ mod world;
 use vertex::{TriangleMesh, Vertex};
 use world::World;
 
+// Change this to change all values related to framecapping!
+// Note: this is SOFT due to the fact that we may or may not sleep
+// less, since we do calculations to not over-sleep, which may not
+// be perfect because for some reason keeping time is difficult
+const SOFT_FPS_CAP: u64 = 10;
+
+const MAX_MICROS_BETWEEN_FRAMES: u64 = 1000000 / SOFT_FPS_CAP;
+const MAX_MILLIS_BETWEEN_FRAMES: u64 = MAX_MICROS_BETWEEN_FRAMES / 1000;
+
+const DURATION_BETWEEN_FRAMES: Duration = Duration::from_micros(MAX_MICROS_BETWEEN_FRAMES);
 #[derive(Default, Debug)]
 struct ScreenSpaceMesh {
     triangles: Vec<vertex::TriangleMesh>,
@@ -66,9 +77,9 @@ fn main() {
     video_ctx.gl_attr().set_context_major_version(4);
     video_ctx.gl_attr().set_context_minor_version(1);
     let window = video_ctx
-        .window("SDL", 800, 600)
+        .window("SDL world test", 800, 600)
         .position_centered()
-        .resizable()
+        // .resizable()
         .opengl()
         .build()
         .unwrap();
@@ -86,7 +97,8 @@ fn main() {
 
     let mut event_pump = sdl_ctx.event_pump().unwrap();
 
-    let mut _world = World::new();
+    let mut world = World::new();
+    eprintln!("World: 0x{:x}", (&raw const world).addr());
     let mut screen_world = ScreenSpaceMesh::default();
     let mut _camera = Camera::default();
     screen_world.add_tri(TriangleMesh(
@@ -115,9 +127,15 @@ fn main() {
     //         pos: glm::vec3(-0.5, 0.5, 0.0),
     //     },
     // ));
-    let mut sleep_passed = false;
+    let mut updated_opengl_viewport_this_frame;
 
+    let mut frame_count: u64 = 1;
+
+    let mut frametime_collector = Vec::with_capacity(SOFT_FPS_CAP.try_into().unwrap());
+    let mut last_frametime_check = Instant::now();
     'going: loop {
+        let time_before_render = Instant::now();
+        updated_opengl_viewport_this_frame = false;
         for event in event_pump.poll_iter() {
             use sdl2::event::Event as Ev;
             match event {
@@ -129,12 +147,13 @@ fn main() {
                     break 'going;
                 }
                 Ev::Window {
-                    timestamp,
+                    timestamp: _,
                     window_id,
                     win_event: WindowEvent::Resized(width, height),
                 } if window_id == main_id => {
-                    if sleep_passed {
-                        sleep_passed = false;
+                    // Only resize the opengl window once per update
+                    if !updated_opengl_viewport_this_frame {
+                        updated_opengl_viewport_this_frame = true;
                         unsafe {
                             gl::Viewport(0, 0, width, height);
                         }
@@ -144,25 +163,36 @@ fn main() {
             }
         }
 
-        unsafe {
-            gl::ClearColor(0.2, 0.2, 0.3, 1.0);
-            gl::Clear(gl::COLOR_BUFFER_BIT);
-            render_ctx.render_world(&screen_world).unwrap();
-            render_ui();
-        }
+        render_ctx.clear().unwrap();
+        render_ctx.render_world(&screen_world).unwrap();
+        render_ui();
+
         window.gl_swap_window();
-        let now = SystemTime::now();
-        println!(
-            "Now: {}",
-            now.duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_millis()
-        );
-        thread::sleep(Duration::from_millis(100));
-        sleep_passed = true;
+
+        let before_sleep = Instant::now();
+        // Hard cap fps
+        thread::sleep(DURATION_BETWEEN_FRAMES - before_sleep.duration_since(time_before_render));
+        let now = Instant::now();
+        let seconds = now.duration_since(before_sleep).as_secs_f64();
+        frametime_collector.push(seconds);
+
+        // If it's been over a second since
+        // last debug print, print it
+        if now.duration_since(last_frametime_check).as_secs() >= 1 {
+            // can't reduce since we're keeping this Vec around
+            let total_time = frametime_collector.iter().fold(0., |acc, item| acc + *item);
+            // i love you rust but why can't i turbofish into()
+            let len_int32: i32 = frametime_collector.len().try_into().unwrap();
+            let len_float: f64 = len_int32.into();
+            let avg_time: f64 = total_time / len_float;
+            eprintln!("Average frametime (in seconds) over last second: {avg_time:0.5}");
+
+            frametime_collector.clear();
+            last_frametime_check = Instant::now();
+        }
+
+        frame_count += 1;
     }
 }
 
-fn render_ui() {
-    ()
-}
+fn render_ui() {}
