@@ -12,7 +12,8 @@ impl World<'_> {
             brushes: vec![],
         }
     }
-    pub fn add_brush<T: Brush + 'static>(&mut self, brush: T) {
-        self.brushes.push(Box::new(brush));
+    // Add a brush to this world.
+    pub fn add_brush(&mut self, brush: Box<dyn Brush>) {
+        self.brushes.push(brush);
     }
 }

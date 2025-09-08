@@ -1,6 +1,6 @@
-use std::ptr::slice_from_raw_parts;
+use std::{any::type_name, ptr::slice_from_raw_parts};
 
-use crate::render::render_vec::{BoxedBytes, GlLayout, GlType};
+use crate::render::render_vec::{BoxedBytes, GlLayout, GlType, GlTypeList};
 
 // #[derive(Default, Debug, Clone, Copy)]
 // pub struct Vector3_32 {
@@ -26,15 +26,24 @@ use crate::render::render_vec::{BoxedBytes, GlLayout, GlType};
 //     }
 // }
 
-pub fn to_byte_slice(floats: &[f32]) -> &[u8] {
-    unsafe { std::slice::from_raw_parts(floats.as_ptr() as *const _, floats.len() * 4) }
+pub fn to_byte_slice<T>(slice: &[T]) -> &[u8] {
+    unsafe { std::slice::from_raw_parts(slice.as_ptr().cast(), std::mem::size_of_val(slice)) }
 }
 
-pub fn from_byte_slice(bytes: &[u8]) -> &[f32] {
-    unsafe { std::slice::from_raw_parts(bytes.as_ptr() as *const _, bytes.len() / 4) }
+pub fn from_byte_slice<T>(bytes: &[u8]) -> &[T] {
+    let bytes_stride_t = size_of::<T>();
+    if bytes.len() % bytes_stride_t != 0 {
+        panic!(
+            "Cannot make slice of {} safely from slice of bytes",
+            type_name::<T>()
+        );
+    }
+    unsafe { std::slice::from_raw_parts(bytes.as_ptr().cast(), bytes.len() / bytes_stride_t) }
 }
 
-unsafe impl GlLayout for glm::Vec3 {
+// SAFETY:
+// Vec3 is a vec of 3 Floats
+unsafe impl GlLayout<3> for glm::Vec3 {
     fn as_gl_bytes(&self) -> &[u8] {
         // SAFETY:
         // glm::Vec3 is repr(C), meaning it's laid out in memory
@@ -45,10 +54,10 @@ unsafe impl GlLayout for glm::Vec3 {
                 .unwrap()
         };
 
-        to_byte_slice(&slice)
+        to_byte_slice(slice)
     }
-    fn gl_type_layout() -> Box<[GlType]> {
-        Box::new([GlType::Float, GlType::Float, GlType::Float])
+    fn gl_type_layout() -> GlTypeList<3> {
+        GlTypeList::new([GlType::Float, GlType::Float, GlType::Float])
     }
 }
 

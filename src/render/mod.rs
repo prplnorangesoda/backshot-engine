@@ -12,6 +12,7 @@ use sdl2::video::GLContext;
 use crate::{
     ScreenSpaceMesh,
     gl_wrappers::{program::Program, shader::Shader},
+    render::render_vec::{GlType, GlTypeList},
     vector3::to_byte_slice,
 };
 use render_vec::{BoxedBytes, GlLayout, RenderVec};
@@ -57,8 +58,13 @@ pub struct InputParams {
     position: Vec3,
     color: Vec3,
 }
+// TODO: fixme, this smells!
+// don't want to dupe magic numbers, but making a constant unrelated to the type
+// is REALLY BAD, and Rust doesn't allow const fns in traits, so we can't
+// chuck the length logic in a trait and still use it in type sigs!
+pub const INPUTPARAMS_TYPE_LENGTH: usize = 6;
 
-unsafe impl GlLayout for InputParams {
+unsafe impl GlLayout<INPUTPARAMS_TYPE_LENGTH> for InputParams {
     fn as_gl_bytes(&self) -> &[u8] {
         let ret: &[u8] = unsafe {
             let floats: &[f32] = slice_from_raw_parts((self as *const InputParams).cast(), 6)
@@ -68,16 +74,11 @@ unsafe impl GlLayout for InputParams {
         };
         ret
     }
-    fn gl_type_layout() -> Box<[crate::render::render_vec::GlType]> {
+    fn gl_type_layout() -> GlTypeList<INPUTPARAMS_TYPE_LENGTH> {
         let box_1 = Vec3::gl_type_layout();
         let box_2 = Vec3::gl_type_layout();
-        let mut vec = Vec::with_capacity(box_1.len() + box_2.len());
-        vec.extend_from_slice(&box_1);
-        vec.extend_from_slice(&box_2);
-        let ret = vec.into_boxed_slice();
 
-        // println!("InputParams gl_type_layout() box: {ret:?}");
-        ret
+        GlTypeList::new([box_1[0], box_1[1], box_1[2], box_2[0], box_2[1], box_2[2]])
     }
 }
 
@@ -172,7 +173,7 @@ impl Render {
         Ok(())
     }
     pub fn render_world(&mut self, world: &ScreenSpaceMesh) -> Result<(), ()> {
-        let mut render_vec: RenderVec<InputParams> = RenderVec::new();
+        let mut render_vec: RenderVec<InputParams, INPUTPARAMS_TYPE_LENGTH> = RenderVec::new();
         // let mut vertex_arr: Vec<f64> = Vec::with_capacity(world.triangles.len() * 9);
         // dbg!(&world);
         // let colors = [0.584, 0.203, 0.92];
@@ -186,18 +187,18 @@ impl Render {
         //     vertex_arr.extend_from_slice(&colors);
         // }
         let color = glm::vec3(0.584, 0.203, 0.92);
-        for tri in world.triangles.iter() {
-            let tri = tri.clone();
+        for tri in world.planes.iter() {
+            let plane = tri.clone();
             render_vec.push(InputParams {
-                position: tri.0.pos,
+                position: plane[0].pos,
                 color,
             });
             render_vec.push(InputParams {
-                position: tri.1.pos,
+                position: plane[1].pos,
                 color,
             });
             render_vec.push(InputParams {
-                position: tri.2.pos,
+                position: plane[2].pos,
                 color,
             });
         }
