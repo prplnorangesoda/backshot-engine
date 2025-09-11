@@ -7,15 +7,15 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug executable 'opengl_raw_rust'",
+      "name": "Debug executable 'backshot_engine'",
       "cargo": {
         "args": [
           "build",
-          "--bin=opengl_raw_rust",
-          "--package=opengl_raw_rust"
+          "--bin=backshot_engine",
+          "--package=backshot_engine"
         ],
         "filter": {
-          "name": "opengl_raw_rust",
+          "name": "backshot_engine",
           "kind": "bin"
         }
       },
@@ -25,16 +25,16 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in executable 'opengl_raw_rust'",
+      "name": "Debug unit tests in executable 'backshot_engine'",
       "cargo": {
         "args": [
           "test",
           "--no-run",
-          "--bin=opengl_raw_rust",
-          "--package=opengl_raw_rust"
+          "--bin=backshot_engine",
+          "--package=backshot_engine"
         ],
         "filter": {
-          "name": "opengl_raw_rust",
+          "name": "backshot_engine",
           "kind": "bin"
         }
       },

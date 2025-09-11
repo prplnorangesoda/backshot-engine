@@ -13,12 +13,13 @@ pub struct ProgramArgs<'a> {
     pub extra_shaders: &'a [&'a CompiledShader],
 }
 
+#[macro_export]
 macro_rules! construct_program {
     ($vert_sh:expr, $geo_shader:expr, $frag_shader:expr; $($any_extra_shader:expr),*) => {
         compile_error!("Not implemented");
     };
     ($vert_sh:expr, $frag_shader:expr; $($any_extra_shader:expr),*) => {{
-        let args = crate::gl_wrappers::program::ProgramArgs {
+        let args = $crate::gl_wrappers::program::ProgramArgs {
             vert_shader: &$vert_sh,
             geo_shader: None,
             frag_shader: &$frag_shader,
@@ -26,7 +27,7 @@ macro_rules! construct_program {
                 $(&$any_extra_shader),*
             ]
         };
-        Program::from_args(args)
+        $crate::gl_wrappers::program::Program::from_args(args)
     }};
 }
 
@@ -76,5 +77,27 @@ impl Program {
 
     pub fn id(&self) -> gl::types::GLuint {
         self.id
+    }
+    pub fn get_uniform_location(&self, name: &str) -> Option<gl::types::GLint> {
+        let name = CString::new(name).unwrap();
+        unsafe {
+            let uniform_location = gl::GetUniformLocation(self.id, name.as_ptr().cast());
+            if uniform_location < 0 {
+                None
+            } else {
+                Some(uniform_location)
+            }
+        }
+    }
+    pub fn get_attrib_location(&self, name: &str) -> Option<gl::types::GLint> {
+        let name = CString::new(name).unwrap();
+        unsafe {
+            let attrib_location = gl::GetAttribLocation(self.id, name.as_ptr().cast());
+            if attrib_location < 0 {
+                None
+            } else {
+                Some(attrib_location)
+            }
+        }
     }
 }

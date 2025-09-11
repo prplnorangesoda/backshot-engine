@@ -1,5 +1,7 @@
 #![allow(dead_code, clippy::let_and_return)]
 use std::{
+    ffi::{c_char, c_void},
+    ptr::null,
     thread,
     time::{Duration, Instant},
 };
@@ -43,6 +45,9 @@ const MAX_MILLIS_BETWEEN_FRAMES: u64 = MAX_MICROS_BETWEEN_FRAMES / 1000;
 
 const DURATION_BETWEEN_FRAMES: Duration = Duration::from_micros(MAX_MICROS_BETWEEN_FRAMES);
 
+const START_WIDTH: i32 = 800;
+const START_HEIGHT: i32 = 600;
+
 /// The actual planes rendered to the screen.
 #[derive(Default, Debug)]
 struct ScreenSpaceMesh {
@@ -80,6 +85,21 @@ impl Default for Camera {
     }
 }
 
+// void APIENTRY glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity,
+//                            GLsizei length, const char *message, const void *userParam);
+
+extern "system" fn gl_debug_output(
+    source: gl::types::GLenum,
+    output_type: gl::types::GLenum,
+    id: gl::types::GLuint,
+    severity: gl::types::GLenum,
+    length: gl::types::GLsizei,
+    message: *const c_char,
+    user_param: *mut c_void,
+) {
+    println!("Debug output called")
+}
+
 fn main() {
     let sdl_ctx = sdl2::init().unwrap();
 
@@ -101,6 +121,7 @@ fn main() {
     video_ctx
         .gl_attr()
         .set_context_profile(video::GLProfile::Core);
+
     let window = video_ctx
         .window("SDL world test", 800, 600)
         .position_centered()
@@ -114,11 +135,18 @@ fn main() {
     gl::load_with(|s| video_ctx.gl_get_proc_address(s).cast());
 
     unsafe {
-        gl::Viewport(0, 0, 800, 600);
+        gl::Viewport(0, 0, START_WIDTH, START_HEIGHT);
+        gl::Enable(gl::DEBUG_OUTPUT);
+        gl::Enable(gl::DEBUG_OUTPUT_SYNCHRONOUS);
+        gl::DebugMessageCallback(Some(gl_debug_output), null());
     }
 
     let gl_ctx = window.gl_create_context().unwrap();
     let mut render_ctx = Render::init(&gl_ctx);
+
+    render_ctx.clear().unwrap();
+    window.gl_swap_window();
+
     let mut imgui = Context::create();
     /* disable creation of files on disc */
     imgui.set_ini_filename(None);
@@ -130,7 +158,7 @@ fn main() {
         .add_font(&[imgui::FontSource::DefaultFontData { config: None }]);
 
     let mut imgui_platform = ImguiSdlPlatform::new(&mut imgui);
-    // let mut imgui_renderer = ImguiRenderer::new();
+    let mut imgui_renderer = ImguiRenderer::new(&mut imgui);
 
     let mut event_pump = sdl_ctx.event_pump().unwrap();
 
@@ -165,15 +193,17 @@ fn main() {
     //         pos: glm::vec3(-0.5, 0.5, 0.0),
     //     },
     // ));
-    let mut updated_opengl_viewport_this_frame;
 
     let mut frame_count: u64 = 1;
 
-    let mut frametime_collector = Vec::with_capacity(SOFT_FPS_CAP.try_into().unwrap());
+    let mut frametime_collector = Vec::with_capacity(SOFT_FPS_CAP as usize);
     let mut last_frametime_check = Instant::now();
+
+    let mut frame_width = START_WIDTH;
+    let mut frame_height = START_HEIGHT;
+
     'going: loop {
         let time_before_render = Instant::now();
-        updated_opengl_viewport_this_frame = false;
         for event in event_pump.poll_iter() {
             imgui_platform.handle_event(&mut imgui, &event);
             use sdl2::event::Event as Ev;
@@ -190,27 +220,24 @@ fn main() {
                     window_id,
                     win_event: WindowEvent::Resized(width, height),
                 } if window_id == main_id => {
-                    // Only resize the opengl window once per update
-                    // The event loop poll happens once per frame, but many
-                    // resize events can stack up.
-                    if !updated_opengl_viewport_this_frame {
-                        updated_opengl_viewport_this_frame = true;
-                        unsafe {
-                            gl::Viewport(0, 0, width, height);
-                        }
-                    }
+                    frame_width = width;
+                    frame_height = height;
                 }
                 _ => {}
             }
         }
 
+        unsafe {
+            gl::Viewport(0, 0, frame_width, frame_height);
+        }
         render_ctx.clear().unwrap();
         render_ctx.render_world(&screen_world).unwrap();
 
-        // imgui_platform.prepare_frame(&mut imgui, &window, &event_pump);
-        // let draw_data = create_ui(&mut imgui);
+        imgui_platform.prepare_frame(&mut imgui, &window, &event_pump);
+        let draw_data = create_ui(&mut imgui);
 
-        // // imgui_renderer.render(draw_data);
+        imgui_renderer.render(draw_data);
+
         window.gl_swap_window();
 
         let before_sleep = Instant::now();
@@ -229,9 +256,7 @@ fn main() {
         if now.duration_since(last_frametime_check).as_secs() >= 1 {
             // can't reduce since we're keeping this Vec around
             let total_time = frametime_collector.iter().fold(0., |acc, item| acc + *item);
-            // i love you rust but why can't i turbofish into()
-            let len_int32: i32 = frametime_collector.len().try_into().unwrap();
-            let len_float: f64 = len_int32.into();
+            let len_float: f64 = frametime_collector.len() as f64;
             let avg_time: f64 = total_time / len_float;
             eprintln!(
                 "frametime: {avg_time:0.8}, FPS: {:0.8}, frames counted: {:05}",
