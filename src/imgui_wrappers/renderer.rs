@@ -245,6 +245,15 @@ impl ImguiRenderer {
                 }
             }
         }
+        self.post_render(data, frame_width, frame_height)
+    }
+
+    fn post_render(&mut self, data: &DrawData, frame_width: f32, frame_height: f32) {
+        unsafe {
+            gl::Disable(gl::SCISSOR_TEST);
+            gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+            gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, 0);
+        }
     }
     #[allow(clippy::too_many_arguments)]
     fn render_elements(

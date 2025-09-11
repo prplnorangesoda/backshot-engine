@@ -102,6 +102,9 @@ impl Render {
             gl::GenVertexArrays(1, &mut vao);
             gl::BindVertexArray(vao);
 
+            eprintln!("Render vbo: {vbo}");
+            eprintln!("Render vao: {vao}");
+
             gl::BufferData(gl::ARRAY_BUFFER, 0, null(), gl::DYNAMIC_DRAW);
 
             // gl::VertexAttribPointer(
