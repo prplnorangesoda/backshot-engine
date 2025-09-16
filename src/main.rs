@@ -305,5 +305,8 @@ fn imgui_create() -> (Context, ImguiSdlPlatform, ImguiRenderer) {
 }
 
 fn create_ui(imgui: &mut Context) -> &DrawData {
+    let ui = imgui.new_frame();
+
+    ui.bullet_text("Hi");
     imgui.render()
 }
