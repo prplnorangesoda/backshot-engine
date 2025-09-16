@@ -32,6 +32,7 @@ use crate::{
     construct_program,
     gl_wrappers::{program::Program, shader::Shader},
     vector3::to_byte_slice,
+    vertex,
 };
 
 pub struct ImguiRenderer {
@@ -215,6 +216,11 @@ impl ImguiRenderer {
         if frame_width <= 0.0 || frame_height <= 0.0 {
             return;
         }
+        let mut vertex_array_object = 0;
+        unsafe {
+            gl::CreateVertexArrays(1, &mut vertex_array_object);
+            gl::BindVertexArray(vertex_array_object);
+        }
         self.pre_render(data, frame_width, frame_height);
         for draw_list in data.draw_lists() {
             unsafe {
@@ -244,6 +250,9 @@ impl ImguiRenderer {
                     DrawCmd::ResetRenderState => self.pre_render(data, frame_width, frame_height),
                 }
             }
+        }
+        unsafe {
+            gl::DeleteVertexArrays(1, &vertex_array_object);
         }
         self.post_render(data, frame_width, frame_height)
     }
@@ -458,8 +467,8 @@ fn prepare_font_atlas<T: TextureMap>(
 
     unsafe {
         gl::BindTexture(gl::TEXTURE_2D, gl_texture);
-        gl::TextureParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as _);
-        gl::TextureParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as _);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as _);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as _);
         gl::TexImage2D(
             gl::TEXTURE_2D,
             0,

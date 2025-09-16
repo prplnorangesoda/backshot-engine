@@ -96,49 +96,38 @@ impl Render {
 
             let mut vbo = 0;
             gl::GenBuffers(1, &mut vbo);
-            gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
-
             let mut vao = 0;
             gl::GenVertexArrays(1, &mut vao);
+
+            // bind the Vertex Array Object first, then bind and set vertex buffers, and then configure attributes
             gl::BindVertexArray(vao);
+            gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
 
             eprintln!("Render vbo: {vbo}");
             eprintln!("Render vao: {vao}");
 
+            // we're NamedBufferData-ing this later when we need to use it
             gl::BufferData(gl::ARRAY_BUFFER, 0, null(), gl::DYNAMIC_DRAW);
 
-            // gl::VertexAttribPointer(
-            //     0,
-            //     3,
-            //     gl::DOUBLE,
-            //     gl::FALSE,
-            //     (6 * std::mem::size_of::<f64>()).try_into().unwrap(),
-            //     null(),
-            // );
+            // position attrib
             gl::VertexAttribPointer(
                 0,
                 3,
                 gl::FLOAT,
                 gl::FALSE,
-                (6 * std::mem::size_of::<f32>()).try_into().unwrap(),
+                (6 * size_of::<f32>()).try_into().unwrap(),
                 null(),
             );
             gl::EnableVertexAttribArray(0);
-            // gl::VertexAttribPointer(
-            //     1,
-            //     3,
-            //     gl::DOUBLE,
-            //     gl::FALSE,
-            //     (6 * std::mem::size_of::<f32>()).try_into().unwrap(),
-            //     (3 * std::mem::size_of::<f32>()) as *const _,
-            // );
+
+            // color attrib
             gl::VertexAttribPointer(
                 1,
                 3,
                 gl::FLOAT,
                 gl::FALSE,
-                (6 * std::mem::size_of::<f32>()).try_into().unwrap(),
-                (3 * std::mem::size_of::<f32>()) as *const _,
+                (6 * size_of::<f32>()).try_into().unwrap(),
+                (3 * size_of::<f32>()) as *const _,
             );
             gl::EnableVertexAttribArray(1);
 
@@ -160,8 +149,8 @@ impl Render {
             gl::PolygonMode(gl::FRONT_AND_BACK, gl::FILL);
 
             // reset bound arrays
-            gl::BindBuffer(gl::ARRAY_BUFFER, 0);
             gl::BindVertexArray(0);
+            gl::BindBuffer(gl::ARRAY_BUFFER, 0);
             (vao, vbo, program)
         };
 
@@ -241,7 +230,10 @@ impl Render {
             //     println!("]");
             // }
             // let error_pre = gl::GetError() == gl::TRUE.into();
+            gl::BindBuffer(gl::ARRAY_BUFFER, self.vbo);
             gl::DrawArrays(gl::TRIANGLES, 0, render_vec.gl_len());
+
+            gl::BindVertexArray(0);
             let error_post = gl::GetError() == gl::TRUE.into();
             if error_post {
                 eprintln!("There was an error after gl::DrawArrays !!!");
