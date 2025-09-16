@@ -1,6 +1,6 @@
 use std::{any::type_name, ptr::slice_from_raw_parts};
 
-use crate::render::render_vec::{BoxedBytes, GlLayout, GlType, GlTypeList};
+use crate::render::render_vec::{GlLayout, GlType, GlTypeList};
 
 // #[derive(Default, Debug, Clone, Copy)]
 // pub struct Vector3_32 {

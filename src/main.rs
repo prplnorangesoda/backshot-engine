@@ -1,22 +1,28 @@
 #![allow(dead_code, clippy::let_and_return)]
 use std::{
-    ffi::{c_char, c_void},
+    ffi::{CStr, c_char, c_void},
+    fs::File,
+    io::{self, Write},
     ptr::null,
     thread,
     time::{Duration, Instant},
 };
 
 use glm::Vec3;
-use imgui::{Context, DrawData};
+use imgui::Context;
 use imgui_sdl2_support::SdlPlatform as ImguiSdlPlatform;
 use render::Render;
-use sdl2::{event::WindowEvent, keyboard::Keycode, video};
+use sdl2::{
+    EventPump, Sdl, VideoSubsystem,
+    event::WindowEvent,
+    keyboard::Keycode,
+    video::{self, GLContext},
+};
 
-mod brush;
-mod entity;
 mod imgui_wrappers;
 #[macro_use]
 mod gl_wrappers;
+mod map;
 mod render;
 mod ui;
 mod vector3;
@@ -27,28 +33,34 @@ use vertex::Vertex;
 use world::World;
 
 use crate::{
-    brush::{BrushPlane, NGonPlane, TriPlane},
     gl_wrappers::gl_upd_viewport,
     imgui_wrappers::renderer::ImguiRenderer,
+    map::parser::parse_map,
+    ui::{Ui, ui_manager::UiManager},
+    world::brush::{BrushPlane, NGonPlane, TriPlane},
 };
 
 /// This determines all values related to framecapping!
 ///
 /// Note: this is SOFT due to the fact that we may or may not sleep
 /// less, since we do calculations to not over-sleep, which may not
-/// be perfect because for some reason keeping time is difficult
-const SOFT_FPS_CAP: u64 = 1000;
+/// be perfect if the frame was rendered very quickly
+pub const SOFT_FPS_CAP: u64 = 60;
 
-const OPENGL_MAJOR_VER: u8 = 4;
-const OPENGL_MINOR_VER: u8 = 3;
+pub const OPENGL_MAJOR_VER: u8 = 4;
+pub const OPENGL_MINOR_VER: u8 = 3;
 
-const MAX_MICROS_BETWEEN_FRAMES: u64 = 1_000_000 / SOFT_FPS_CAP;
-const MAX_MILLIS_BETWEEN_FRAMES: u64 = MAX_MICROS_BETWEEN_FRAMES / 1000;
+pub const MAX_MICROS_BETWEEN_FRAMES: u64 = 1_000_000 / SOFT_FPS_CAP;
+pub const MAX_MILLIS_BETWEEN_FRAMES: u64 = MAX_MICROS_BETWEEN_FRAMES / 1000;
 
-const DURATION_BETWEEN_FRAMES: Duration = Duration::from_micros(MAX_MICROS_BETWEEN_FRAMES);
+pub const DURATION_BETWEEN_FRAMES: Duration = Duration::from_micros(MAX_MICROS_BETWEEN_FRAMES);
 
-const START_WIDTH: u32 = 800;
-const START_HEIGHT: u32 = 600;
+pub const DURATION_30FPS: Duration = Duration::from_micros(1_000_000 / 30);
+pub const DURATION_60FPS: Duration = Duration::from_micros(1_000_000 / 60);
+pub const DURATION_144FPS: Duration = Duration::from_micros(1_000_000 / 144);
+
+pub const START_WIDTH: u32 = 800;
+pub const START_HEIGHT: u32 = 600;
 
 /// The actual planes rendered to the screen.
 #[derive(Debug)]
@@ -88,6 +100,17 @@ impl ScreenSpaceMesh {
                 pos: glm::vec3(-0.5, 0.5, 0.0),
             },
         ]));
+        // screen_world.add_tri(TriangleMesh(
+        //     Vertex {
+        //         pos: glm::vec3(0.5, -0.5, 0.0),
+        //     },
+        //     Vertex {
+        //         pos: glm::vec3(0.5, 0.5, 0.0),
+        //     },
+        //     Vertex {
+        //         pos: glm::vec3(-0.5, 0.5, 0.0),
+        //     },
+        // ));
         ret
     }
 }
@@ -115,31 +138,48 @@ impl Default for Camera {
 
 extern "system" fn gl_debug_output(
     _source: gl::types::GLenum,
-    _output_type: gl::types::GLenum,
+    output_type: gl::types::GLenum,
     _id: gl::types::GLuint,
     _severity: gl::types::GLenum,
     _length: gl::types::GLsizei,
-    _message: *const c_char,
+    message: *const c_char,
     _user_param: *mut c_void,
 ) {
-    println!("Debug output called")
+    let type_str = match output_type {
+        gl::DEBUG_TYPE_ERROR => "Type: Error",
+        gl::DEBUG_TYPE_DEPRECATED_BEHAVIOR => "Type: Deprecated Behaviour",
+        gl::DEBUG_TYPE_UNDEFINED_BEHAVIOR => "Type: Undefined Behaviour",
+        gl::DEBUG_TYPE_PORTABILITY => "Type: Portability",
+        gl::DEBUG_TYPE_PERFORMANCE => "Type: Performance",
+        gl::DEBUG_TYPE_MARKER => "Type: Marker",
+        gl::DEBUG_TYPE_PUSH_GROUP => "Type: Push Group",
+        gl::DEBUG_TYPE_POP_GROUP => "Type: Pop Group",
+        gl::DEBUG_TYPE_OTHER => "Type: Other",
+        _ => unimplemented!(),
+    };
+    let message_str = unsafe { CStr::from_ptr(message) };
+    let message_str = message_str.to_string_lossy();
+    eprintln!("Debug output called. \n{type_str}\nMessage: {message_str}");
 }
 
 fn main() {
-    let (sdl_ctx, video_ctx, window, main_id) = init_sdl().unwrap();
+    let (_sdl_ctx, video_ctx, mut event_pump) = init_sdl().unwrap();
+    let (window, main_id, gl_ctx) = make_main_window(&video_ctx).unwrap();
+
+    // setup gl loading with sdl
     gl::load_with(|s| video_ctx.gl_get_proc_address(s).cast());
 
-    let mut event_pump = sdl_ctx.event_pump().unwrap();
+    let mut s = String::with_capacity(64);
+    print!("map: ");
+    io::stdout().flush().unwrap();
+    io::stdin().read_line(&mut s).unwrap();
 
-    let gl_ctx = window.gl_create_context().unwrap();
+    s.pop();
 
+    let map_file = File::open(format!("maps/{}.map", s)).unwrap();
+    let map_data = parse_map(map_file).unwrap();
     gl_upd_viewport(START_WIDTH, START_HEIGHT);
-
-    unsafe {
-        gl::Enable(gl::DEBUG_OUTPUT);
-        gl::Enable(gl::DEBUG_OUTPUT_SYNCHRONOUS);
-        gl::DebugMessageCallback(Some(gl_debug_output), null());
-    }
+    gl_setup();
 
     let mut render_ctx = Render::init(&gl_ctx);
 
@@ -148,31 +188,16 @@ fn main() {
 
     let (mut imgui, mut imgui_platform, mut imgui_renderer) = imgui_create();
 
-    let mut world = World::new();
+    let world = World::new();
     eprintln!("World: 0x{:x}", (&raw const world).addr());
     let mut _camera = Camera::default();
 
-    let mut screen_world = ScreenSpaceMesh::simple();
-
-    // screen_world.add_tri(TriangleMesh(
-    //     Vertex {
-    //         pos: glm::vec3(0.5, -0.5, 0.0),
-    //     },
-    //     Vertex {
-    //         pos: glm::vec3(0.5, 0.5, 0.0),
-    //     },
-    //     Vertex {
-    //         pos: glm::vec3(-0.5, 0.5, 0.0),
-    //     },
-    // ));
-
-    let mut frame_count: u64 = 1;
-
-    let mut frametime_collector = Vec::with_capacity(SOFT_FPS_CAP as usize);
-    let mut last_debug_check = Instant::now();
+    let screen_world = ScreenSpaceMesh::simple();
 
     let mut frame_width: u32 = START_WIDTH;
     let mut frame_height: u32 = START_HEIGHT;
+
+    let mut ui = UiManager::new();
 
     // how much time last frame took to render
     let mut delta_time = 0.;
@@ -206,55 +231,82 @@ fn main() {
         render_ctx.render_world(&screen_world).unwrap();
 
         imgui_platform.prepare_frame(&mut imgui, &window, &event_pump);
-        let draw_data = create_ui(&mut imgui);
+        let frame = imgui.new_frame();
 
+        ui.update(delta_time);
+        ui.draw(frame);
+
+        let draw_data = imgui.render();
         imgui_renderer.render(draw_data);
 
         window.gl_swap_window();
 
         let instant_before_sleep = Instant::now();
+
         // Soft cap fps
-        thread::sleep(
-            DURATION_BETWEEN_FRAMES
-                .checked_sub(instant_before_sleep.duration_since(instant_loop_start))
-                .unwrap_or(Duration::ZERO),
-        );
+        let opt = DURATION_BETWEEN_FRAMES
+            .checked_sub(instant_before_sleep.duration_since(instant_loop_start));
+        // Are we under the max time between frames?
+        if let Some(time) = opt {
+            thread::sleep(time);
+        }
+
         let instant_after_sleep = Instant::now();
 
         let frametime = instant_after_sleep
             .duration_since(instant_loop_start)
             .as_secs_f64();
-        frametime_collector.push(frametime);
 
-        // If it's been over a second since
-        // last debug print, print it
-        if instant_after_sleep
-            .duration_since(last_debug_check)
-            .as_secs()
-            >= 1
-        {
-            // can't reduce since we're keeping this Vec around
-            let total_time = frametime_collector.iter().fold(0., |acc, item| acc + *item);
-            let len_float: f64 = frametime_collector.len() as f64;
-            let avg_time: f64 = total_time / len_float;
-            eprintln!(
-                "frametime: {avg_time:0.8}, FPS: {:0.8}, frames counted: {:05}",
-                1. / avg_time,
-                frametime_collector.len()
-            );
+        ui.debug.push(frametime);
 
-            frametime_collector.clear();
-            last_debug_check = Instant::now();
-        }
-
-        frame_count += 1;
         delta_time = Instant::now()
             .duration_since(instant_loop_start)
             .as_secs_f64();
     }
 }
 
-fn init_sdl() -> Result<(sdl2::Sdl, sdl2::VideoSubsystem, video::Window, u32), String> {
+fn gl_setup() {
+    unsafe {
+        // setup debug logging and filtering
+        gl::Enable(gl::DEBUG_OUTPUT);
+        gl::Enable(gl::DEBUG_OUTPUT_SYNCHRONOUS);
+        gl::DebugMessageCallback(Some(gl_debug_output), null());
+        gl::DebugMessageControl(
+            gl::DONT_CARE,
+            gl::DONT_CARE,
+            gl::DONT_CARE,
+            0,
+            null(),
+            gl::FALSE,
+        );
+        gl::DebugMessageControl(
+            gl::DONT_CARE,
+            gl::DONT_CARE,
+            gl::DEBUG_SEVERITY_HIGH,
+            0,
+            null(),
+            gl::TRUE,
+        );
+        gl::DebugMessageControl(
+            gl::DONT_CARE,
+            gl::DONT_CARE,
+            gl::DEBUG_SEVERITY_MEDIUM,
+            0,
+            null(),
+            gl::TRUE,
+        );
+        gl::DebugMessageControl(
+            gl::DONT_CARE,
+            gl::DONT_CARE,
+            gl::DEBUG_SEVERITY_LOW,
+            0,
+            null(),
+            gl::TRUE,
+        );
+    }
+}
+
+fn init_sdl() -> Result<(Sdl, VideoSubsystem, EventPump), String> {
     let sdl_ctx = sdl2::init()?;
 
     let video_ctx = sdl_ctx.video()?;
@@ -276,6 +328,14 @@ fn init_sdl() -> Result<(sdl2::Sdl, sdl2::VideoSubsystem, video::Window, u32), S
         .gl_attr()
         .set_context_profile(video::GLProfile::Core);
 
+    let event_pump = sdl_ctx.event_pump()?;
+
+    Ok((sdl_ctx, video_ctx, event_pump))
+}
+
+fn make_main_window(
+    video_ctx: &sdl2::VideoSubsystem,
+) -> Result<(video::Window, u32, GLContext), String> {
     let window = video_ctx
         .window("SDL world test", 800, 600)
         .position_centered()
@@ -284,8 +344,10 @@ fn init_sdl() -> Result<(sdl2::Sdl, sdl2::VideoSubsystem, video::Window, u32), S
         .build()
         .map_err(|_| String::from(concat!("Error creating window. {} {}", file!(), line!())))?;
 
+    let gl_ctx = window.gl_create_context()?;
     let main_id = window.id();
-    Ok((sdl_ctx, video_ctx, window, main_id))
+
+    Ok((window, main_id, gl_ctx))
 }
 
 fn imgui_create() -> (Context, ImguiSdlPlatform, ImguiRenderer) {
@@ -302,11 +364,4 @@ fn imgui_create() -> (Context, ImguiSdlPlatform, ImguiRenderer) {
     let imgui_platform = ImguiSdlPlatform::new(&mut imgui);
     let imgui_renderer = ImguiRenderer::new(&mut imgui);
     (imgui, imgui_platform, imgui_renderer)
-}
-
-fn create_ui(imgui: &mut Context) -> &DrawData {
-    let ui = imgui.new_frame();
-
-    ui.bullet_text("Hi");
-    imgui.render()
 }

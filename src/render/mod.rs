@@ -12,10 +12,10 @@ use sdl2::video::GLContext;
 use crate::{
     ScreenSpaceMesh,
     gl_wrappers::{program::Program, shader::Shader},
-    render::render_vec::{GlType, GlTypeList},
+    render::render_vec::GlTypeList,
     vector3::to_byte_slice,
 };
-use render_vec::{BoxedBytes, GlLayout, RenderVec};
+use render_vec::{GlLayout, RenderVec};
 
 pub struct Render {
     vbo: gltype::GLuint,

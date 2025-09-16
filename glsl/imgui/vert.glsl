@@ -5,8 +5,9 @@ layout (location = 1) in vec2 uv;
 layout (location = 2) in vec4 color;
 
 uniform mat4 matrix;
-out vec2 fragment_uv;
-out vec4 fragment_color;
+
+layout (location = 0) out vec2 fragment_uv;
+layout (location = 1) out vec4 fragment_color;
 
 // Because imgui only specifies sRGB colors
 vec4 srgb_to_linear(vec4 srgb_color) {

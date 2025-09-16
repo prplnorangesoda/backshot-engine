@@ -2,6 +2,7 @@ use core::fmt;
 use std::{ffi::c_void, marker::PhantomData, ops::Deref};
 
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct BoxedBytes(pub Box<[u8]>);
 
 impl Deref for BoxedBytes {
@@ -19,6 +20,7 @@ impl fmt::Binary for BoxedBytes {
     }
 }
 
+#[repr(transparent)]
 #[derive(Clone)]
 pub struct GlTypeList<const LEN: usize>(pub [GlType; LEN]);
 
@@ -74,9 +76,9 @@ pub struct RenderVec<LAYOUT: GlLayout<LEN>, const LEN: usize> {
     _phantom: PhantomData<LAYOUT>,
 }
 
-impl<const LEN: usize, LAYOUT: GlLayout<LEN>> RenderVec<LAYOUT, LEN> {
+impl<const LEN: usize, LayoutT: GlLayout<LEN>> RenderVec<LayoutT, LEN> {
     pub fn new() -> Self {
-        let layout = LAYOUT::gl_type_layout();
+        let layout = LayoutT::gl_type_layout();
 
         let mut stride = 0;
         for gl_type in layout.iter() {
@@ -90,15 +92,15 @@ impl<const LEN: usize, LAYOUT: GlLayout<LEN>> RenderVec<LAYOUT, LEN> {
             _phantom: PhantomData,
         }
     }
-    pub fn push(&mut self, value: LAYOUT) {
+    pub fn push(&mut self, value: LayoutT) {
         // dbg!("render_vec: pushing");
-        self.inner.extend_from_slice(&value.as_gl_bytes());
+        self.inner.extend_from_slice(value.as_gl_bytes());
         // dbg!(&self.inner);
     }
-    pub fn extend_from_slice(&mut self, slice: &[LAYOUT]) {
+    pub fn extend_from_slice(&mut self, slice: &[LayoutT]) {
         self.inner.reserve(slice.len() * self.stride);
         for value in slice {
-            self.inner.extend_from_slice(&value.as_gl_bytes());
+            self.inner.extend_from_slice(value.as_gl_bytes());
         }
     }
     pub fn stride(&self) -> usize {

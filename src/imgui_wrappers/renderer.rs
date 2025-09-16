@@ -32,7 +32,6 @@ use crate::{
     construct_program,
     gl_wrappers::{program::Program, shader::Shader},
     vector3::to_byte_slice,
-    vertex,
 };
 
 pub struct ImguiRenderer {
@@ -102,7 +101,7 @@ impl ImguiRenderer {
 
         let font_atlas_texture =
             prepare_font_atlas(imgui_context.fonts(), &mut imgui_texture_map).unwrap();
-        let shaders = Shaders::new(true).unwrap();
+        let shaders = Shaders::new().unwrap();
         let vbo_handle = unsafe {
             let mut id = 0;
             gl::GenBuffers(1, &mut id);
@@ -254,10 +253,10 @@ impl ImguiRenderer {
         unsafe {
             gl::DeleteVertexArrays(1, &vertex_array_object);
         }
-        self.post_render(data, frame_width, frame_height)
+        self.post_render();
     }
 
-    fn post_render(&mut self, data: &DrawData, frame_width: f32, frame_height: f32) {
+    fn post_render(&mut self) {
         unsafe {
             gl::Disable(gl::SCISSOR_TEST);
             gl::BindBuffer(gl::ARRAY_BUFFER, 0);
@@ -338,19 +337,20 @@ struct Shaders {
 }
 
 impl Shaders {
-    fn new(output_srgb: bool) -> Result<Self, ShaderError> {
-        let (vertex_source, fragment_source) = Self::get_shader_sources(output_srgb)?;
+    fn new() -> Result<Self, ShaderError> {
+        const VERTEX_BODY: &str = include_str!("../../glsl/imgui/vert.glsl");
+        const FRAGMENT_BODY: &str = include_str!("../../glsl/imgui/frag.glsl");
 
-        let vertex_source = CString::from_str(&vertex_source).unwrap();
-        let fragment_source = CString::from_str(&fragment_source).unwrap();
+        let vertex_source = CString::from_str(VERTEX_BODY).unwrap();
+        let fragment_source = CString::from_str(FRAGMENT_BODY).unwrap();
 
-        let vertex_shader = Shader::vertex(vertex_source)
-            .compile()
-            .map_err(ShaderError::CreateShader)?;
+        let vertex_shader = Shader::vertex(vertex_source).compile().map_err(|str| {
+            ShaderError::CreateShader(format!("Error on create vert shader: {str}"))
+        })?;
 
-        let fragment_shader = Shader::fragment(fragment_source)
-            .compile()
-            .map_err(ShaderError::CreateShader)?;
+        let fragment_shader = Shader::fragment(fragment_source).compile().map_err(|str| {
+            ShaderError::CreateShader(format!("Error on create frag shader: {str}"))
+        })?;
 
         let program = construct_program!(vertex_shader, fragment_shader;)
             .map_err(ShaderError::CreateProgram)?;
@@ -376,24 +376,6 @@ impl Shaders {
                 as _,
             program,
         })
-    }
-
-    fn get_shader_sources(output_srgb: bool) -> Result<(String, String), ShaderError> {
-        const VERTEX_BODY: &str = include_str!("../../glsl/imgui/vert.glsl");
-        const FRAGMENT_BODY: &str = include_str!("../../glsl/imgui/frag.glsl");
-
-        let vertex_source = String::from(VERTEX_BODY);
-        let fragment_source = format!(
-            "#version 430 core\n{defines}\n{body}",
-            defines = if output_srgb {
-                "\n#define OUTPUT_SRGB"
-            } else {
-                ""
-            },
-            body = FRAGMENT_BODY,
-        );
-
-        Ok((vertex_source, fragment_source))
     }
 }
 

@@ -1,8 +1,7 @@
-use std::time::Duration;
-
 pub mod debug_ui;
+pub mod ui_manager;
 
 pub trait Ui {
-    fn update(delta_time: f64);
-    fn render(context: &mut imgui::Context);
+    fn update(&mut self, delta_time: f64);
+    fn draw(&mut self, context: &mut imgui::Ui);
 }

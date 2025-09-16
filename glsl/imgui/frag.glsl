@@ -1,7 +1,9 @@
-in vec2 fragment_uv;
-in vec4 fragment_color;
+#version 430 core
+layout (location = 0) in vec2 fragment_uv;
+layout (location = 1) in vec4 fragment_color;
 
-uniform sampler2D tex;
+layout (binding = 1) uniform sampler2D tex;
+
 layout (location = 0) out vec4 out_color;
 
 vec4 linear_to_srgb(vec4 linear_color) {

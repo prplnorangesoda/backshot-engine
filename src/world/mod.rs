@@ -1,4 +1,8 @@
-use crate::{brush::Brush, entity::Entity};
+pub mod brush;
+pub mod entity;
+
+use brush::Brush;
+use entity::Entity;
 
 pub struct World<'a> {
     entities: Vec<&'a dyn Entity>,
