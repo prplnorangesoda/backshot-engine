@@ -54,7 +54,7 @@ const MAX_SECTION_HEADER_SIZE_PART_LEN: usize = "4294967295\n".len();
 const MAX_SECTION_HEADER_SIZE_PART_LEN: usize = "18446744073709551615\n".len();
 
 #[cfg(not(any(target_pointer_width = "32", target_pointer_width = "64")))]
-compile_error!("unrecognized pointer width");
+compile_error!("unrecognized pointer width, compile with 32 or 64-bit");
 
 const MIN_SECTION_HEADER_TYPE_PART_LEN: usize = ".B ".len();
 const MAX_SECTION_HEADER_TYPE_PART_LEN: usize = ".B ".len();
@@ -168,10 +168,10 @@ pub fn parse_map(mut input: impl Read) -> Result<MapData, ParseError> {
         dbg!(buf_ptr);
         dbg!(ended_at);
         dbg!(size_part.len());
-        eprintln!(
-            "if we cut size_part to ended_at: '{}'",
-            String::from_utf8_lossy(&size_part[..ended_at])
-        );
+        // eprintln!(
+        //     "if we cut size_part to ended_at: '{}'",
+        //     String::from_utf8_lossy(&size_part[..ended_at])
+        // );
         // eprintln!(
         //     "buf_safe from here on: '{}'",
         //     String::from_utf8_lossy(&buf_safe[buf_ptr..])
@@ -193,6 +193,7 @@ pub fn parse_map(mut input: impl Read) -> Result<MapData, ParseError> {
             .parse()
             .expect("digits should be able to make usize");
 
+        dbg!(size);
         line_count += 1;
 
         let leftover_bytes = &buf_safe[buf_ptr..];
@@ -226,11 +227,7 @@ fn parse_entities<'a>(
     if size == 0 {
         return Ok((EntityData, leftover_bytes));
     }
-    let mut buf = vec![0; size].into_boxed_slice();
-
-    input.read_exact(&mut buf).map_err(|_| {
-        ParseError::UnexpectedEOF(format!(".B: could not read size {size} from input"))
-    })?;
+    let buf = parser_read_dynamic_alloc(input, size, leftover_bytes)?;
     todo!()
 }
 
@@ -242,12 +239,29 @@ fn parse_brushes<'a>(
     if size == 0 {
         return Ok((BrushData, leftover_bytes));
     }
-    let mut buf = vec![0; size].into_boxed_slice();
+    let buf = parser_read_dynamic_alloc(input, size, leftover_bytes)?;
 
-    input.read_exact(&mut buf).map_err(|_| {
-        ParseError::UnexpectedEOF(format!(".B: could not read size {size} from input"))
-    })?;
     todo!()
+}
+
+/// Read an input with dynamic size,
+/// taking into account leftover bytes
+fn parser_read_dynamic_alloc(
+    input: &mut impl Read,
+    size: usize,
+    leftover_bytes: &[u8],
+) -> Result<Box<[u8]>, ParseError> {
+    let mut buf = vec![0; size].into_boxed_slice();
+    let min_len = min(leftover_bytes.len(), buf.len());
+
+    buf[..min_len].copy_from_slice(&leftover_bytes[..min_len]);
+
+    input.read_exact(&mut buf[min_len..]).map_err(|err| {
+        ParseError::UnexpectedEOF(format!(
+            "parser_read: could not read size {size} from input: {err}"
+        ))
+    })?;
+    Ok(buf)
 }
 
 const FILE_HEADER: &[u8; 11] = b"1113be_map\n";

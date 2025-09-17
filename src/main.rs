@@ -10,7 +10,6 @@ use std::{
 
 use glm::Vec3;
 use imgui::Context;
-use imgui_sdl2_support::SdlPlatform as ImguiSdlPlatform;
 use render::Render;
 use sdl2::{
     EventPump, Sdl, VideoSubsystem,
@@ -34,7 +33,7 @@ use world::World;
 
 use crate::{
     gl_wrappers::gl_upd_viewport,
-    imgui_wrappers::renderer::ImguiRenderer,
+    imgui_wrappers::{renderer::ImguiRenderer, sdlplatform::SdlPlatform as ImguiSdlPlatform},
     map::parser::parse_map,
     ui::{Ui, ui_manager::UiManager},
     world::brush::{BrushPlane, NGonPlane, TriPlane},
