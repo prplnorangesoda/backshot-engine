@@ -163,6 +163,7 @@ extern "system" fn gl_debug_output(
 
 fn main() {
     let (_sdl_ctx, video_ctx, mut event_pump) = init_sdl().unwrap();
+
     let (window, main_id, gl_ctx) = make_main_window(&video_ctx).unwrap();
 
     // setup gl loading with sdl
@@ -344,6 +345,8 @@ fn make_main_window(
         .map_err(|_| String::from(concat!("Error creating window. {} {}", file!(), line!())))?;
 
     let gl_ctx = window.gl_create_context()?;
+    video_ctx.gl_set_swap_interval(0)?;
+
     let main_id = window.id();
 
     Ok((window, main_id, gl_ctx))

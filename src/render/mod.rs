@@ -15,7 +15,7 @@ use crate::{
     render::render_vec::GlTypeList,
     vector3::to_byte_slice,
 };
-use render_vec::{GlLayout, RenderVec};
+use render_vec::{RenderVec, StaticGlLayout};
 
 pub struct Render {
     vbo: gltype::GLuint,
@@ -64,7 +64,7 @@ pub struct InputParams {
 // chuck the length logic in a trait and still use it in type sigs!
 pub const INPUTPARAMS_TYPE_LENGTH: usize = 6;
 
-unsafe impl GlLayout<INPUTPARAMS_TYPE_LENGTH> for InputParams {
+unsafe impl StaticGlLayout<INPUTPARAMS_TYPE_LENGTH> for InputParams {
     fn as_gl_bytes(&self) -> &[u8] {
         let ret: &[u8] = unsafe {
             let floats: &[f32] = slice_from_raw_parts((self as *const InputParams).cast(), 6)

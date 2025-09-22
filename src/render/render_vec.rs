@@ -1,25 +1,6 @@
 use core::fmt;
 use std::{ffi::c_void, marker::PhantomData, ops::Deref};
 
-#[derive(Debug)]
-#[repr(transparent)]
-pub struct BoxedBytes(pub Box<[u8]>);
-
-impl Deref for BoxedBytes {
-    type Target = [u8];
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl fmt::Binary for BoxedBytes {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let iter = self.0.iter().map(|byte| format!("{:08b}", byte));
-        f.write_str("BoxedBytes ")?;
-        f.debug_list().entries(iter).finish()
-    }
-}
-
 #[repr(transparent)]
 #[derive(Clone)]
 pub struct GlTypeList<const LEN: usize>(pub [GlType; LEN]);
@@ -40,14 +21,24 @@ impl<const LEN: usize> Deref for GlTypeList<LEN> {
 /// Refactored to explicitly be comptime with the LEN parameter,
 /// as `GlType`s are ZSTs.
 ///
-/// Not dyn-compatible. TODO: Implement a DynGlLayout which dynamically grabs type layouts from dyn objects.
+/// Not dyn-compatible. Use [`DynamicGlLayout`] if that's what you're looking for.
 /// This trait is built around static comptime optimizes.
 /// # Safety
 /// You must ensure that `as_gl_bytes` and `gl_type_layout` match each other in terms of byte layout.
 /// If `gl_type_layout()` returns Float, Float, Float, `as_gl_bytes` must return a slice of 3 f32s.
 ///
-pub unsafe trait GlLayout<const LEN: usize> {
+pub unsafe trait StaticGlLayout<const LEN: usize> {
     fn gl_type_layout() -> GlTypeList<LEN>;
+
+    fn as_gl_bytes(&self) -> &[u8];
+}
+
+/// Dyn-compatible gl type layout.
+/// # Safety
+/// You must ensure that `as_gl_bytes` and `gl_type_layout` match each other in terms of byte layout.
+/// If `gl_type_layout()` returns Float, Float, Float, `as_gl_bytes` must return a slice of 3 f32s.
+pub unsafe trait DynamicGlLayout {
+    fn gl_type_layout(&self) -> Box<[GlType]>;
 
     fn as_gl_bytes(&self) -> &[u8];
 }
@@ -69,14 +60,14 @@ impl GlType {
 
 // refactored to avoid allocations
 #[derive(Clone)]
-pub struct RenderVec<LAYOUT: GlLayout<LEN>, const LEN: usize> {
+pub struct RenderVec<LAYOUT: StaticGlLayout<LEN>, const LEN: usize> {
     inner: Vec<u8>,
     layout: GlTypeList<LEN>,
     stride: usize,
     _phantom: PhantomData<LAYOUT>,
 }
 
-impl<const LEN: usize, LayoutT: GlLayout<LEN>> RenderVec<LayoutT, LEN> {
+impl<const LEN: usize, LayoutT: StaticGlLayout<LEN>> RenderVec<LayoutT, LEN> {
     pub fn new() -> Self {
         let layout = LayoutT::gl_type_layout();
 
