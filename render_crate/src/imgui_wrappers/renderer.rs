@@ -348,7 +348,7 @@ impl ImguiRenderer {
 }
 
 /// Shaders and locations of their variables, necessary to render ImGui UI to the OpenGL context.
-struct Shaders {
+pub struct Shaders {
     /// The program to be bound on rendering.
     program: Program,
     /// The location of the font atlas texture.

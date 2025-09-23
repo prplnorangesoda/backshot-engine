@@ -1,8 +1,10 @@
+//! Exports [`DebugUi`].
 use std::time::Instant;
 
 use crate::{SOFT_FPS_CAP, ui::Ui};
 use render::imgui;
 
+/// UI showing frametime.
 pub struct DebugUi {
     frametime_collector: Vec<f64>,
     last_debug_check: Instant,
@@ -27,7 +29,7 @@ impl Ui for DebugUi {
             let millis = avg_time * 1000.;
 
             let formatted = format!(
-                "frametime: {millis:0.2}ms, FPS: {:0.1}, frames counted: {:05}",
+                "frametime: {millis:0.2}ms, FPS: {:0.2}, frames counted: {:05}",
                 1. / avg_time,
                 self.frametime_collector.len()
             );

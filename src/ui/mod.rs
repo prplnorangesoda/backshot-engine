@@ -1,3 +1,4 @@
+//! UI, UI elements and associated functions.
 pub mod debug_ui;
 pub mod ui_manager;
 

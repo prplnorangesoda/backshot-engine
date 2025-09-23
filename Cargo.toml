@@ -5,7 +5,7 @@ edition = "2024"
 
 # Licensing information for dependencies can be found in README.md.
 [dependencies]
-render = { path = "./render_crate", features = ["blanket_dyn_gl"] }
+render = { path = "./render_crate" }
 world = { path = "./world_crate" }
 
 sdl2 = { path = "./thirdparty/rust-sdl2" }

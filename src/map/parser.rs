@@ -1,11 +1,16 @@
 //! Exports [`parse_map`].
 #![allow(clippy::missing_docs_in_private_items)] // TODO: remove this
 use std::{
+    borrow::Cow,
     cmp::min,
     io::{self, Read},
 };
 
-use world::Vertex;
+use render::glm::vec3;
+use world::{
+    Vertex,
+    brush::{BrushPlane, NGonPlane, TriPlane},
+};
 
 /// It is guaranteed that all `PlaneDatas`
 /// have 3+ vertices.
@@ -263,10 +268,13 @@ fn read_until_byte(buf: &[u8], ptr: &mut usize, byte: u8) -> Result<(), ParseErr
             "EOF found while trying to read until '{:?}'",
             byte as char
         )))?;
-        dbg!(byte_at_idx as char);
+        // dbg!(byte_at_idx as char);
         if byte != b'\n' && is_comment(buf, our_ptr) {
             eprintln!("byte is comment, reading until newline");
-            read_until_newline(buf, &mut our_ptr)?
+            read_until_newline(buf, &mut our_ptr)?;
+            // ensure we don't accidentally skip another character
+            // fixes breaking if newline goes directly into a comment
+            continue 'reading;
         }
         if byte_at_idx == byte {
             eprintln!("matched byte {:?}", byte as char);
@@ -296,15 +304,91 @@ fn parse_entities_save_leftovers(
     todo!()
 }
 
-fn parse_brush_data(buf: &[u8]) -> Result<(BrushData, usize), ParseError> {
-    let mut ptr = 0;
-    read_until_byte(buf, &mut ptr, b'e')?;
+/// Returns data, new ptr index, and line counts.
+#[allow(unused_labels)]
+fn parse_brush_data(
+    buf: &[u8],
+    has_positive_sign: bool,
+) -> Result<(BrushData, usize, i32), Cow<'static, str>> {
+    assert!(
+        has_positive_sign,
+        "can't deal with non positive signed input yet"
+    );
+    let mut ptr: usize = 0;
+    let mut lines_added = 0;
+    let mut iter = buf.iter().cloned();
+
+    macro_rules! next {
+        () => {
+            match iter.next() {
+                Some(byte) => {
+                    ptr += 1;
+                    dbg!(byte as char);
+                    byte
+                },
+                None => {
+                    Err("unexpected end of iterator while parsing vertices. note: 3 numbers must be specified per vertex")?
+                }
+            }
+        };
+    }
+
+    let mut planes = vec![];
+    'plane: loop {
+        let vertices = vec![];
+        'parsing_vertex: loop {
+            let mut nums = vec![];
+            if is_comment(buf, ptr) {
+                read_until_newline(buf, &mut ptr);
+                lines_added += 1;
+            }
+            match next!() {
+                b'+' => (),
+                b'-' => (),
+                b'\n' => {
+                    lines_added += 1;
+                    break 'parsing_vertex;
+                }
+                b => Err(format!(
+                    "expected positive or negative sign to begin vertex number set, or newline to end set, got: {}",
+                    b as char
+                ))?,
+            }
+            'nums_loop: for _ in 0..3 {
+                let mut digits_parsed = 0;
+                'reading_num: loop {
+                    let b = next!();
+                    if !b.is_ascii_digit() && b != b'.' {
+                        break 'reading_num;
+                    }
+                    digits_parsed += 1;
+                }
+                let num_str = str::from_utf8(&buf[ptr..(ptr + digits_parsed)])
+                    .expect("ascii digits should make valid utf8");
+
+                let num: f32 = num_str
+                    .parse()
+                    .map_err(|err| format!("failed parsing number: {err:?}"))?;
+                nums.push(num);
+                // skip over space
+                next!();
+            }
+        }
+        let plane = if vertices.len() == 3 {
+            BrushPlane::Triangle(TriPlane(vertices.try_into().unwrap()))
+        } else {
+            BrushPlane::NGon(NGonPlane(vertices.into_boxed_slice()))
+        };
+        planes.push(plane);
+    }
+    // read_until_byte(buf, &mut ptr, b'e')?;
 
     Ok((
         BrushData {
             planes: Box::new([]),
         },
         ptr,
+        lines_added,
     ))
 }
 
@@ -341,15 +425,22 @@ fn parse_brushes_save_leftovers(
             read_until_newline(&buf, &mut ptr)?;
             continue 'parse;
         }
-        if byte != b'b' {
-            malformed!(
+        let pos_sign = match byte {
+            b'p' => true,
+            b'b' => false,
+            b => malformed!(
                 lc,
-                format!("byte '{}' was not brush data starter `b`", byte as char)
-            );
-        }
-        let (brush_data, new_ptr) = parse_brush_data(&buf[ptr..])?;
+                format!("byte '{}' was not brush data starter 'b'", b as char)
+            ),
+        };
+        // skip 'b', '\n'
+        ptr += 2;
+        *lc += 1;
+        let (brush_data, offset, new_lc) = parse_brush_data(&buf[ptr..], pos_sign)
+            .map_err(|x| ParseError::BadInput(x.into_owned()))?;
         brushes.push(brush_data);
-        ptr = new_ptr;
+        ptr += offset;
+        *lc += new_lc;
     }
     Ok((brushes.into_boxed_slice(), ret_leftover))
 }

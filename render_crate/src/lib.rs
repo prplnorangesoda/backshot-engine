@@ -1,9 +1,10 @@
 //! The rendering arm of the engine.
-#![allow(incomplete_features, dead_code, clippy::let_and_return)]
-#![cfg_attr(
-    feature = "blanket_dyn_gl",
-    feature(generic_const_exprs, generic_const_items)
-)]
+#![allow(dead_code, clippy::let_and_return)]
+#![feature(generic_const_exprs, generic_const_items)]
+#![allow(incomplete_features)]
+#[cfg(doc)]
+compile_error!("rustdoc does not support generic const expressions");
+
 use std::{
     ffi::CStr,
     ops::Deref,

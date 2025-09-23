@@ -112,8 +112,8 @@ fn main() {
 
     s.pop();
 
-    // let map_file = File::open(format!("maps/{}.map", s)).unwrap();
-    // let map_data = parse_map(map_file).unwrap();
+    let map_file = File::open(format!("maps/{}.map", s)).unwrap();
+    let map_data = parse_map(map_file).unwrap();
     gl_upd_viewport(START_WIDTH, START_HEIGHT);
     gl_setup();
 
