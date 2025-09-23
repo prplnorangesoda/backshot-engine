@@ -1,20 +1,30 @@
+//! Exports [`Shader`] and [`CompiledShader`].
 use std::{ffi::CString, ptr::null};
 
+/// An uncompiled OpenGL shader.
+/// Contains the source code necessary to compile it.
 pub struct Shader {
+    /// GL ID for this shader.
     inner: gl::types::GLuint,
+    /// The source code for this shader.
     source: CString,
+    /// Was this shader
     was_compiled: bool,
 }
 
+/// Represents the type of a shader object.
 pub enum ShaderType {
+    /// This shader is a Fragment shader.
     Fragment,
+    /// This shader is a Geometry shader.
     Geometry,
+    /// This shader is a Vertex shader.
     Vertex,
 }
 
 impl Shader {
     /// Wrap shader source code into a type-safe Rust struct.
-    pub fn new<T: Into<CString>>(shader_type: ShaderType, source: T) -> Self {
+    pub fn new(shader_type: ShaderType, source: impl Into<CString>) -> Self {
         let shader = unsafe {
             match shader_type {
                 ShaderType::Fragment => gl::CreateShader(gl::FRAGMENT_SHADER),
@@ -36,11 +46,17 @@ impl Shader {
     pub fn fragment(source: CString) -> Self {
         Self::new(ShaderType::Fragment, source)
     }
-    /// Helper function for `Shader::new()` with geo shaders.
+    /// Helper function for `Shader::new()` with geometry shaders.
     pub fn geometry(source: CString) -> Self {
         Self::new(ShaderType::Geometry, source)
     }
 
+    /// Compile this shader.
+    ///
+    /// Returns a [`CompiledShader`], for use in [`Program`](super::Program)s.
+    ///
+    /// # Errors
+    /// Errors if compilation was unsuccessful, with the response from OpenGL.
     pub fn compile(mut self) -> Result<CompiledShader, String> {
         let compiled_shader = unsafe {
             gl::ShaderSource(self.inner, 1, &self.source.as_ptr(), null());
@@ -61,7 +77,7 @@ impl Shader {
             self.inner
         };
         // Safety: we check for
-        unsafe { Ok(CompiledShader::from_uint_unchecked(compiled_shader)) }
+        unsafe { Ok(CompiledShader::new_unchecked(compiled_shader)) }
     }
 }
 
@@ -81,17 +97,37 @@ impl Drop for CompiledShader {
         };
     }
 }
-
+/// A compiled shader object.
+/// This can be linked and used in [`Program`](super::Program)s.
 pub struct CompiledShader {
+    /// GL ID for this compiled shader.
     id: gl::types::GLuint,
 }
 
 impl CompiledShader {
+    /// Create a new CompiledShader from the GL ID of a compiled shader.
+    ///
+    /// # Errors
+    /// Errors if `shader` is not the index of a valid compiled shader in the OpenGL context.
+    pub fn new(_shader: gl::types::GLuint) -> Result<Self, ()> {
+        unimplemented!()
+    }
+
+    /// Alias for [`CompiledShader::new`].
+    pub fn from_opengl_uint(uint: gl::types::GLuint) -> Result<Self, ()> {
+        Self::new(uint)
+    }
+
+    /// Create a new CompiledShader from the GL ID of a compiled shader.
+    /// For a safe version, see [`CompiledShader::new`].
+    ///
     /// # Safety
     /// The uint passed into this function MUST be a uint returned by `gl::CompileShader`.
-    pub unsafe fn from_uint_unchecked(shader: gl::types::GLuint) -> Self {
+    /// Otherwise, using this struct is undefined behaviour!
+    pub unsafe fn new_unchecked(shader: gl::types::GLuint) -> Self {
         Self { id: shader }
     }
+    /// Get the internal GL ID of this shader.
     pub fn id(&self) -> gl::types::GLuint {
         self.id
     }

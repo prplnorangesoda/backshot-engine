@@ -1,21 +1,118 @@
+//! The rendering arm of the engine.
+#![allow(incomplete_features, dead_code, clippy::let_and_return)]
+#![cfg_attr(
+    feature = "blanket_dyn_gl",
+    feature(generic_const_exprs, generic_const_items)
+)]
 use std::{
     ffi::CStr,
+    ops::Deref,
     ptr::{null, slice_from_raw_parts},
 };
 
+extern crate world;
+
+pub mod gl_wrappers;
+pub mod imgui_wrappers;
 pub mod render_vec;
+pub mod vector3;
+
+pub use gl;
+pub use gl_wrappers::gl_upd_viewport;
+pub use glm;
+pub use imgui;
 
 use gl::types as gltype;
 use glm::Vec3;
 use sdl2::video::GLContext;
+use world::{
+    Vertex,
+    brush::{BrushPlane, NGonPlane, TriPlane},
+};
 
 use crate::{
-    ScreenSpaceMesh,
     gl_wrappers::{program::Program, shader::Shader},
-    render::render_vec::GlTypeList,
+    render_vec::{GlTypeList, RenderVec, StaticGlLayout},
     vector3::to_byte_slice,
 };
-use render_vec::{RenderVec, StaticGlLayout};
+
+/// The actual planes rendered to the screen.
+#[derive(Debug)]
+pub struct ScreenSpaceMesh {
+    /// Internal vector of planes to be rendered.
+    planes: Vec<BrushPlane>,
+}
+
+impl ScreenSpaceMesh {
+    /// Create a new mesh.
+    pub fn new() -> Self {
+        Self { planes: vec![] }
+    }
+    /// Add a triangle to the internal vector.
+    pub fn add_tri(&mut self, tri: TriPlane) {
+        self.planes.push(BrushPlane::Triangle(tri));
+    }
+    /// Add an N-gon to the internal vector.
+    pub fn add_ngon(&mut self, ngon: NGonPlane) {
+        self.planes.push(BrushPlane::NGon(ngon))
+    }
+
+    /// Clears the internal vector, removing all polys.
+    pub fn clear(&mut self) {
+        self.planes.clear();
+    }
+
+    /// create this struct with one triangle
+    pub fn simple() -> Self {
+        let mut ret = Self::new();
+        ret.add_tri(TriPlane([
+            // Left
+            Vertex {
+                pos: glm::vec3(-0.5, -0.5, 0.0),
+            },
+            // Right
+            Vertex {
+                pos: glm::vec3(0.5, -0.5, 0.0),
+            },
+            // Up
+            Vertex {
+                pos: glm::vec3(-0.5, 0.5, 0.0),
+            },
+        ]));
+        // screen_world.add_tri(TriangleMesh(
+        //     Vertex {
+        //         pos: glm::vec3(0.5, -0.5, 0.0),
+        //     },
+        //     Vertex {
+        //         pos: glm::vec3(0.5, 0.5, 0.0),
+        //     },
+        //     Vertex {
+        //         pos: glm::vec3(-0.5, 0.5, 0.0),
+        //     },
+        // ));
+        ret
+    }
+}
+
+/// A camera in the scene.
+pub struct Camera {
+    /// Position in world space.
+    pos: Vec3,
+    /// XYZ Euler angles. (0,0,0) means upwards.
+    /// X: Roll
+    /// Y: Pitch
+    /// Z: Yaw
+    orientation: Vec3,
+}
+
+impl Default for Camera {
+    fn default() -> Self {
+        Self {
+            orientation: glm::vec3(-90.0, 0.0, 0.0),
+            pos: glm::to_vec3(0.),
+        }
+    }
+}
 
 pub struct Render {
     vbo: gltype::GLuint,
@@ -36,8 +133,8 @@ macro_rules! include_cstr {
     }};
 }
 
-const FRAG_SHADER_SOURCE: &CStr = include_cstr!("../../glsl/frag_shader.glsl");
-const VERT_SHADER_SOURCE: &CStr = include_cstr!("../../glsl/vert_shader.glsl");
+const FRAG_SHADER_SOURCE: &CStr = include_cstr!("../glsl/frag_shader.glsl");
+const VERT_SHADER_SOURCE: &CStr = include_cstr!("../glsl/vert_shader.glsl");
 
 static mut INITIALIZED_ALREADY: bool = false;
 
@@ -64,8 +161,9 @@ pub struct InputParams {
 // chuck the length logic in a trait and still use it in type sigs!
 pub const INPUTPARAMS_TYPE_LENGTH: usize = 6;
 
-unsafe impl StaticGlLayout<INPUTPARAMS_TYPE_LENGTH> for InputParams {
-    fn as_gl_bytes(&self) -> &[u8] {
+unsafe impl StaticGlLayout for InputParams {
+    const LEN: usize = INPUTPARAMS_TYPE_LENGTH;
+    fn as_gl_bytes(&self) -> impl Deref<Target = [u8]> {
         let ret: &[u8] = unsafe {
             let floats: &[f32] = slice_from_raw_parts((self as *const InputParams).cast(), 6)
                 .as_ref()
@@ -165,7 +263,7 @@ impl Render {
         Ok(())
     }
     pub fn render_world(&mut self, world: &ScreenSpaceMesh) -> Result<(), ()> {
-        let mut render_vec: RenderVec<InputParams, INPUTPARAMS_TYPE_LENGTH> = RenderVec::new();
+        let mut render_vec: RenderVec<InputParams> = RenderVec::new();
         // let mut vertex_arr: Vec<f64> = Vec::with_capacity(world.triangles.len() * 9);
         // dbg!(&world);
         // let colors = [0.584, 0.203, 0.92];

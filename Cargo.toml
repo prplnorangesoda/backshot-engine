@@ -5,11 +5,7 @@ edition = "2024"
 
 # Licensing information for dependencies can be found in README.md.
 [dependencies]
-# OpenGL reqs
-gl = "0.14.0"
-glm = "0.3.0"
+render = { path = "./render_crate", features = ["blanket_dyn_gl"] }
+world = { path = "./world_crate" }
+
 sdl2 = { path = "./thirdparty/rust-sdl2" }
-# Macro helpers
-paste = "1.0.15"
-# Imgui overlay debug ui
-imgui = "0.12.0"

@@ -1,3 +1,11 @@
+//! This module adapts SDL events to Imgui events,
+//! to make the UI respond to mouse inputs.
+//!
+//! The main export of this module is the [`SdlPlatform`] struct.
+//!
+//! This module contains third-party code. Licensing information can be found in the module source at
+//! `src/imgui_wrappers/sdlplatform.rs`.
+
 // THIS FILE INCLUDES CODE ADAPTED FROM THIRDPARTY CODE!
 // The LICENSE is included below.
 // https://github.com/imgui-rs/imgui-glow-renderer
@@ -35,13 +43,16 @@ use sdl2::{
 /// A backend platform handles window/input device events and manages their
 /// state.
 ///
-/// There are three things you need to do to use this library correctly:
+/// There are three things you need to do to use this struct correctly:
 ///
 /// 1. Initialize a `SdlPlatform` instance
 /// 2. Pass events to the platform (every frame)
 /// 3. Call frame preparation callback (every frame)
 pub struct SdlPlatform {
-    cursor_instance: Option<Cursor>, /* to avoid dropping cursor instances */
+    /// Kept in the struct to avoid creating and then instantly dropping SDL cursor instances.
+    /// Should not be used.
+    cursor_instance: Option<Cursor>,
+    /// When was the last frame?
     last_frame: Instant,
 }
 
@@ -221,6 +232,7 @@ pub fn filter_event(window: &Window, event: &Event) -> bool {
 }
 
 impl SdlPlatform {
+    /// Handle mouse inputs.
     fn handle_mouse_button(
         &mut self,
         io: &mut Io,

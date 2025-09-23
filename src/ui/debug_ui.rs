@@ -1,6 +1,7 @@
 use std::time::Instant;
 
 use crate::{SOFT_FPS_CAP, ui::Ui};
+use render::imgui;
 
 pub struct DebugUi {
     frametime_collector: Vec<f64>,

@@ -1,5 +1,10 @@
+#![allow(dead_code, clippy::let_and_return)]
+
 pub mod brush;
 pub mod entity;
+pub mod vertex;
+
+pub use vertex::Vertex;
 
 use brush::Brush;
 use entity::Entity;

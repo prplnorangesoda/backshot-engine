@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{ffi::c_void, marker::PhantomData, ops::Deref};
+use std::{any::Any, ffi::c_void, marker::PhantomData, ops::Deref};
 
 #[repr(transparent)]
 #[derive(Clone)]
@@ -18,8 +18,7 @@ impl<const LEN: usize> Deref for GlTypeList<LEN> {
     }
 }
 
-/// Refactored to explicitly be comptime with the LEN parameter,
-/// as `GlType`s are ZSTs.
+/// Refactored to explicitly be comptime with the LEN associated const.
 ///
 /// Not dyn-compatible. Use [`DynamicGlLayout`] if that's what you're looking for.
 /// This trait is built around static comptime optimizes.
@@ -27,20 +26,56 @@ impl<const LEN: usize> Deref for GlTypeList<LEN> {
 /// You must ensure that `as_gl_bytes` and `gl_type_layout` match each other in terms of byte layout.
 /// If `gl_type_layout()` returns Float, Float, Float, `as_gl_bytes` must return a slice of 3 f32s.
 ///
-pub unsafe trait StaticGlLayout<const LEN: usize> {
-    fn gl_type_layout() -> GlTypeList<LEN>;
+pub unsafe trait StaticGlLayout {
+    const LEN: usize;
+    /// Returns the GL types that the bytes returned from calling [`as_gl_bytes`] on `self` will map to.
+    ///
+    /// [`as_gl_bytes`]: StaticGlLayout::as_gl_bytes
+    fn gl_type_layout() -> GlTypeList<{ Self::LEN }>
+    where
+        [(); Self::LEN]:;
 
-    fn as_gl_bytes(&self) -> &[u8];
+    /// Returns a byte slice for use in OpenGL rendering.
+    ///
+    /// The types map to what calling [`gl_type_layout`] on `self` would return.
+    ///
+    /// [`gl_type_layout`]: StaticGlLayout::gl_type_layout
+    fn as_gl_bytes(&self) -> impl Deref<Target = [u8]>;
 }
 
 /// Dyn-compatible gl type layout.
+///
 /// # Safety
 /// You must ensure that `as_gl_bytes` and `gl_type_layout` match each other in terms of byte layout.
 /// If `gl_type_layout()` returns Float, Float, Float, `as_gl_bytes` must return a slice of 3 f32s.
 pub unsafe trait DynamicGlLayout {
-    fn gl_type_layout(&self) -> Box<[GlType]>;
+    /// Returns the GL types that the bytes returned from calling [`as_gl_bytes`] on this will map to.
+    ///
+    /// [`as_gl_bytes`]: StaticGlLayout::as_gl_bytes
+    fn dyn_gl_type_layout(&self) -> Box<[GlType]>;
 
-    fn as_gl_bytes(&self) -> &[u8];
+    /// Returns a wrapped type that derefs to a byte slice for use in OpenGL rendering.
+    ///
+    /// The types map to what calling [`gl_type_layout`] on `self` would return.
+    ///
+    /// ## Why Box\<dyn Deref>?
+    /// For `Box::new([...])` and `Box::new(Rc::clone(...))` to both work.
+    ///
+    /// [`gl_type_layout`]: StaticGlLayout::gl_type_layout
+    fn dyn_gl_bytes(&self) -> Box<dyn Deref<Target = [u8]>>;
+}
+
+unsafe impl<T> DynamicGlLayout for T
+where
+    [(); T::LEN]:,
+    T: StaticGlLayout,
+{
+    fn dyn_gl_type_layout(&self) -> Box<[GlType]> {
+        Box::new(T::gl_type_layout().0)
+    }
+    fn dyn_gl_bytes(&self) -> Box<dyn Deref<Target = [u8]>> {
+        Box::new(self.as_gl_bytes().to_owned())
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -60,14 +95,16 @@ impl GlType {
 
 // refactored to avoid allocations
 #[derive(Clone)]
-pub struct RenderVec<LAYOUT: StaticGlLayout<LEN>, const LEN: usize> {
+pub struct RenderVec<LAYOUT: StaticGlLayout> {
     inner: Vec<u8>,
-    layout: GlTypeList<LEN>,
     stride: usize,
     _phantom: PhantomData<LAYOUT>,
 }
 
-impl<const LEN: usize, LayoutT: StaticGlLayout<LEN>> RenderVec<LayoutT, LEN> {
+impl<LayoutT: StaticGlLayout> RenderVec<LayoutT>
+where
+    [(); LayoutT::LEN]:,
+{
     pub fn new() -> Self {
         let layout = LayoutT::gl_type_layout();
 
@@ -78,20 +115,19 @@ impl<const LEN: usize, LayoutT: StaticGlLayout<LEN>> RenderVec<LayoutT, LEN> {
         // eprintln!("New RenderVec created, stride: {stride}");
         Self {
             inner: vec![],
-            layout,
             stride,
             _phantom: PhantomData,
         }
     }
     pub fn push(&mut self, value: LayoutT) {
         // dbg!("render_vec: pushing");
-        self.inner.extend_from_slice(value.as_gl_bytes());
+        self.inner.extend_from_slice(&value.as_gl_bytes());
         // dbg!(&self.inner);
     }
     pub fn extend_from_slice(&mut self, slice: &[LayoutT]) {
         self.inner.reserve(slice.len() * self.stride);
         for value in slice {
-            self.inner.extend_from_slice(value.as_gl_bytes());
+            self.inner.extend_from_slice(&value.as_gl_bytes());
         }
     }
     pub fn stride(&self) -> usize {

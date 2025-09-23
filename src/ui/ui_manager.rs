@@ -1,5 +1,7 @@
 use crate::ui::{Ui, debug_ui::DebugUi};
 
+use render::imgui;
+
 /// A struct to hold all the UI for main.rs
 /// to render in one call.
 pub struct UiManager {

@@ -1,0 +1,17 @@
+[package]
+name = "render"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# OpenGL reqs
+gl = "0.14.0"
+glm = "0.3.0"
+# Imgui overlay debug ui
+imgui = "0.12.0"
+
+
+sdl2 = { path = "../thirdparty/rust-sdl2" }
+world = { path = "../world_crate" }
+[features]
+blanket_dyn_gl = []

@@ -1,9 +1,11 @@
+//! Exports [`parse_map`].
+#![allow(clippy::missing_docs_in_private_items)] // TODO: remove this
 use std::{
     cmp::min,
     io::{self, Read},
 };
 
-use crate::vertex::Vertex;
+use world::Vertex;
 
 /// It is guaranteed that all `PlaneDatas`
 /// have 3+ vertices.
@@ -31,7 +33,7 @@ impl MapData {
 pub enum ParseError {
     ReadError(io::Error),
     BadHeader(String),
-    Malformed(String),
+    BadInput(String),
     UnexpectedEOF(String),
 }
 
@@ -77,7 +79,7 @@ const MAX_SECTION_HEADER_LEN: usize =
 macro_rules! malformed {
     ($line_count:expr, $str:expr) => {{
         let _line_count = $line_count;
-        return Err(ParseError::Malformed(format!("{_line_count}: {}", $str)));
+        return Err(ParseError::BadInput(format!("{_line_count}: {}", $str)));
     }};
 }
 
@@ -258,7 +260,7 @@ fn read_until_byte(buf: &[u8], ptr: &mut usize, byte: u8) -> Result<(), ParseErr
     let mut our_ptr = *ptr;
     'reading: loop {
         let byte_at_idx = *buf.get(our_ptr).ok_or(ParseError::UnexpectedEOF(format!(
-            "EOF found while trying to read until {:?}",
+            "EOF found while trying to read until '{:?}'",
             byte as char
         )))?;
         dbg!(byte_at_idx as char);

@@ -1,0 +1,12 @@
+[package]
+name = "world"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Macro helpers
+paste = "1.0.15"
+glm = "0.3.0"
+
+[features]
+blanket_dyn_gl = []

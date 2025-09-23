@@ -1,6 +1,6 @@
 //! 2D accelerated rendering
 //!
-//! Official C documentation: https://wiki.libsdl.org/CategoryRender
+//! Official C documentation: <https://wiki.libsdl.org/CategoryRender>
 //! # Introduction
 //!
 //! This module contains functions for 2D accelerated rendering.

@@ -1,18 +1,24 @@
+//! Exports [`Program`].
 use std::ffi::CString;
 
-use super::shader::CompiledShader;
+use super::CompiledShader;
 
+/// Wrapper for an OpenGL program.
+///
+/// <https://www.khronos.org/opengl/wiki/GLSL_Object#Program_objects>
 pub struct Program {
+    /// The internal OpenGL id for this object.
     id: gl::types::GLuint,
 }
 
-pub struct ProgramArgs<'a> {
-    pub vert_shader: &'a CompiledShader,
-    pub geo_shader: Option<&'a CompiledShader>,
-    pub frag_shader: &'a CompiledShader,
-    pub extra_shaders: &'a [&'a CompiledShader],
-}
-
+/// Make a new [`Program`].
+///
+/// # Usage
+/// ```no_run
+/// let vert_shader = Shader::vertex(vertex_source_code).compile().unwrap();
+/// let frag_shader = Shader::fragment(frag_source_code).compile().unwrap();
+/// construct_program!(vert_shader, frag_shader;);
+/// ```
 #[macro_export]
 macro_rules! construct_program {
     ($vert_sh:expr, $geo_shader:expr, $frag_shader:expr; $($any_extra_shader:expr),*) => {
@@ -31,7 +37,21 @@ macro_rules! construct_program {
     }};
 }
 
+/// Necessary shaders to create a [`Program`].
+/// Use [`construct_program!`] to easily create one of these.
+pub struct ProgramArgs<'a> {
+    /// A vertex shader.
+    pub vert_shader: &'a CompiledShader,
+    /// An optional geometry shader.
+    pub geo_shader: Option<&'a CompiledShader>,
+    /// A fragment shader.
+    pub frag_shader: &'a CompiledShader,
+    /// Any extra shaders that may be used by other shaders in this program.
+    pub extra_shaders: &'a [&'a CompiledShader],
+}
+
 impl Program {
+    /// Create a new program directly.
     pub fn new(
         vert_shader: &CompiledShader,
         geo_shader: Option<&CompiledShader>,
@@ -44,6 +64,7 @@ impl Program {
             extra_shaders: &[],
         })
     }
+    /// Create a new program from a [`ProgramArgs`] struct.
     pub fn from_args(args: ProgramArgs<'_>) -> Result<Self, String> {
         let inner = unsafe {
             let program = gl::CreateProgram();
@@ -74,12 +95,16 @@ impl Program {
 
         Ok(Self { id: inner })
     }
-
+    /// Get the internal id of this program.
     pub fn id(&self) -> gl::types::GLuint {
         self.id
     }
-    pub fn get_uniform_location(&self, name: &str) -> Option<gl::types::GLint> {
-        let name = CString::new(name).unwrap();
+    /// Get the location of a uniform in this program.
+    ///
+    /// # Panics
+    /// This function panics if `name` contains interior nuls.
+    pub fn get_uniform_location(&self, name: impl AsRef<str>) -> Option<gl::types::GLint> {
+        let name = CString::new(name.as_ref()).unwrap();
         unsafe {
             let uniform_location = gl::GetUniformLocation(self.id, name.as_ptr().cast());
             if uniform_location < 0 {
@@ -89,8 +114,12 @@ impl Program {
             }
         }
     }
-    pub fn get_attrib_location(&self, name: &str) -> Option<gl::types::GLint> {
-        let name = CString::new(name).unwrap();
+    /// Get the location of an attrib in this program.
+    ///
+    /// # Panics
+    /// This function panics if `name` contains interior nuls.
+    pub fn get_attrib_location(&self, name: impl AsRef<str>) -> Option<gl::types::GLint> {
+        let name = CString::new(name.as_ref()).unwrap();
         unsafe {
             let attrib_location = gl::GetAttribLocation(self.id, name.as_ptr().cast());
             if attrib_location < 0 {

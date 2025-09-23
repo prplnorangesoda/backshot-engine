@@ -12,11 +12,9 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 name = "backshot_engine"
 version = "0.1.0"
 dependencies = [
- "gl",
- "glm",
- "imgui",
- "paste",
+ "render",
  "sdl2",
+ "world",
 ]
 
 [[package]]
@@ -201,6 +199,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "render"
+version = "0.1.0"
+dependencies = [
+ "gl",
+ "glm",
+ "imgui",
+ "sdl2",
+ "world",
+]
+
+[[package]]
 name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -306,6 +315,14 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
+
+[[package]]
+name = "world"
+version = "0.1.0"
+dependencies = [
+ "glm",
+ "paste",
+]
 
 [[package]]
 name = "xml-rs"

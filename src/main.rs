@@ -1,4 +1,19 @@
+//! A rendering engine, which can load maps into memory, and render them to a screen.
+//!
+//! ## What is this/what will this be?
+//! - [x] A 3d renderer
+//! - [ ] A map loader
+//! - [ ] Some form of backing for a game
+//! ## What is this NOT?
+//! * A portable interface for you to make your own games
+//!   * at least, not yet
+//! * A real project that will have an end
 #![allow(dead_code, clippy::let_and_return)]
+#![warn(clippy::missing_docs_in_private_items)]
+
+extern crate render;
+extern crate world;
+
 use std::{
     ffi::{CStr, c_char, c_void},
     fs::File,
@@ -8,9 +23,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use glm::Vec3;
-use imgui::Context;
-use render::Render;
+use render::{
+    Camera, Render, ScreenSpaceMesh, gl, gl_upd_viewport,
+    imgui::{self, Context},
+    imgui_wrappers::{renderer::ImguiRenderer, sdlplatform::SdlPlatform as ImguiSdlPlatform},
+};
 use sdl2::{
     EventPump, Sdl, VideoSubsystem,
     event::WindowEvent,
@@ -18,25 +35,14 @@ use sdl2::{
     video::{self, GLContext},
 };
 
-mod imgui_wrappers;
-#[macro_use]
-mod gl_wrappers;
 mod map;
-mod render;
 mod ui;
-mod vector3;
-mod vertex;
-mod world;
 
-use vertex::Vertex;
 use world::World;
 
 use crate::{
-    gl_wrappers::gl_upd_viewport,
-    imgui_wrappers::{renderer::ImguiRenderer, sdlplatform::SdlPlatform as ImguiSdlPlatform},
     map::parser::parse_map,
     ui::{Ui, ui_manager::UiManager},
-    world::brush::{BrushPlane, NGonPlane, TriPlane},
 };
 
 /// This determines all values related to framecapping!
@@ -44,7 +50,7 @@ use crate::{
 /// Note: this is SOFT due to the fact that we may or may not sleep
 /// less, since we do calculations to not over-sleep, which may not
 /// be perfect if the frame was rendered very quickly
-pub const SOFT_FPS_CAP: u64 = 60;
+pub const SOFT_FPS_CAP: u64 = 30;
 
 pub const OPENGL_MAJOR_VER: u8 = 4;
 pub const OPENGL_MINOR_VER: u8 = 3;
@@ -54,87 +60,17 @@ pub const MAX_MILLIS_BETWEEN_FRAMES: u64 = MAX_MICROS_BETWEEN_FRAMES / 1000;
 
 pub const DURATION_BETWEEN_FRAMES: Duration = Duration::from_micros(MAX_MICROS_BETWEEN_FRAMES);
 
-pub const DURATION_30FPS: Duration = Duration::from_micros(1_000_000 / 30);
-pub const DURATION_60FPS: Duration = Duration::from_micros(1_000_000 / 60);
-pub const DURATION_144FPS: Duration = Duration::from_micros(1_000_000 / 144);
+pub const DURATION_PER_30FPS: Duration = Duration::from_micros(1_000_000 / 30);
+pub const DURATION_PER_60FPS: Duration = Duration::from_micros(1_000_000 / 60);
+pub const DURATION_PER_144FPS: Duration = Duration::from_micros(1_000_000 / 144);
 
 pub const START_WIDTH: u32 = 800;
 pub const START_HEIGHT: u32 = 600;
 
-/// The actual planes rendered to the screen.
-#[derive(Debug)]
-struct ScreenSpaceMesh {
-    planes: Vec<BrushPlane>,
-}
-
-impl ScreenSpaceMesh {
-    fn new() -> Self {
-        Self { planes: vec![] }
-    }
-    fn add_tri(&mut self, tri: TriPlane) {
-        self.planes.push(BrushPlane::Triangle(tri));
-    }
-    fn add_ngon(&mut self, ngon: NGonPlane) {
-        self.planes.push(BrushPlane::NGon(ngon))
-    }
-
-    fn clear(&mut self) {
-        self.planes.clear();
-    }
-
-    // create an example with a triangle
-    fn simple() -> Self {
-        let mut ret = Self::new();
-        ret.add_tri(TriPlane([
-            // Left
-            Vertex {
-                pos: glm::vec3(-0.5, -0.5, 0.0),
-            },
-            // Right
-            Vertex {
-                pos: glm::vec3(0.5, -0.5, 0.0),
-            },
-            // Up
-            Vertex {
-                pos: glm::vec3(-0.5, 0.5, 0.0),
-            },
-        ]));
-        // screen_world.add_tri(TriangleMesh(
-        //     Vertex {
-        //         pos: glm::vec3(0.5, -0.5, 0.0),
-        //     },
-        //     Vertex {
-        //         pos: glm::vec3(0.5, 0.5, 0.0),
-        //     },
-        //     Vertex {
-        //         pos: glm::vec3(-0.5, 0.5, 0.0),
-        //     },
-        // ));
-        ret
-    }
-}
-
-struct Camera {
-    pos: Vec3,
-    /// XYZ Euler angles. (0,0,0) means upwards.
-    /// X: Roll
-    /// Y: Pitch
-    /// Z: Yaw
-    orientation: Vec3,
-}
-
-impl Default for Camera {
-    fn default() -> Self {
-        Self {
-            orientation: glm::vec3(-90.0, 0.0, 0.0),
-            pos: glm::to_vec3(0.),
-        }
-    }
-}
-
 // void APIENTRY glDebugOutput(GLenum source, GLenum type, unsigned int id, GLenum severity,
 //                            GLsizei length, const char *message, const void *userParam);
 
+/// OpenGL debug output callback.
 extern "system" fn gl_debug_output(
     _source: gl::types::GLenum,
     output_type: gl::types::GLenum,
@@ -176,8 +112,8 @@ fn main() {
 
     s.pop();
 
-    let map_file = File::open(format!("maps/{}.map", s)).unwrap();
-    let map_data = parse_map(map_file).unwrap();
+    // let map_file = File::open(format!("maps/{}.map", s)).unwrap();
+    // let map_data = parse_map(map_file).unwrap();
     gl_upd_viewport(START_WIDTH, START_HEIGHT);
     gl_setup();
 
@@ -265,6 +201,8 @@ fn main() {
     }
 }
 
+/// Setup all the things that we need for this opengl context.
+/// Currently only handles debug callbacks.
 fn gl_setup() {
     unsafe {
         // setup debug logging and filtering
@@ -306,6 +244,7 @@ fn gl_setup() {
     }
 }
 
+/// Initialize all values necessary for SDL.
 fn init_sdl() -> Result<(Sdl, VideoSubsystem, EventPump), String> {
     let sdl_ctx = sdl2::init()?;
 
@@ -333,6 +272,8 @@ fn init_sdl() -> Result<(Sdl, VideoSubsystem, EventPump), String> {
     Ok((sdl_ctx, video_ctx, event_pump))
 }
 
+/// Create the main SDL window.
+/// Returns the window, its id, and its OpenGL Context.
 fn make_main_window(
     video_ctx: &sdl2::VideoSubsystem,
 ) -> Result<(video::Window, u32, GLContext), String> {
@@ -352,6 +293,7 @@ fn make_main_window(
     Ok((window, main_id, gl_ctx))
 }
 
+/// Setup and create everything for ImGui.
 fn imgui_create() -> (Context, ImguiSdlPlatform, ImguiRenderer) {
     let mut imgui = Context::create();
     /* disable creation of files on disc */

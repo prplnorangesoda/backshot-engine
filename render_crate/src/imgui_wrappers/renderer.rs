@@ -1,3 +1,11 @@
+//! This module actually renders ImGui to the OpenGL context.
+//!
+//! It does this through exposing a [`ImguiRenderer`], which can `render`
+//! ImGui [`DrawData`] to the screen.
+//!
+//! This module contains third-party code. Licensing information can be found in the module source at
+//! `src/imgui_wrappers/renderer.rs`.
+
 // THIS FILE INCLUDES CODE ADAPTED FROM THIRDPARTY CODE!
 // The LICENSE is included below.
 // https://github.com/imgui-rs/imgui-glow-renderer
@@ -29,15 +37,21 @@ use imgui::{
 
 use crate::{
     construct_program,
-    gl_wrappers::{program::Program, shader::Shader},
+    gl_wrappers::{Program, shader::Shader},
     vector3::to_byte_slice,
 };
 
+/// Container for all information and GL handles necessary to render to the screen.
 pub struct ImguiRenderer {
+    /// Contains Imgui texture handles and maps them to GL textures.
     imgui_texture_map: Textures<gl::types::GLuint>,
+    /// Texture indice for the font atlas
     font_atlas_texture: gl::types::GLuint,
+    /// Shaders necessary to rendering ImGui ui.
     shaders: Shaders,
+    /// GL ID for the vertex buffer object
     vbo_handle: gl::types::GLuint,
+    /// GL ID for the element array buffer object
     ebo_handle: gl::types::GLuint,
 }
 
@@ -53,8 +67,13 @@ pub struct ImguiRenderer {
 ///
 /// [`gl_texture`]: Self::gl_texture
 pub trait TextureMap {
+    /// Register a GL texture indice and receive the ImGui ID for it back.
+    ///
+    /// Returns [`None`] if it failed, but no implementations actually fail as of yet.
     fn register(&mut self, gl_texture: gl::types::GLuint) -> Option<TextureId>;
-
+    /// Get the GL indice for a mapped Imgui [`TextureId`].
+    ///
+    /// Returns [`None`] if there was no corresponding indice.
     fn gl_texture(&self, imgui_texture: TextureId) -> Option<gl::types::GLuint>;
 }
 
@@ -86,7 +105,7 @@ impl TextureMap for Textures<gl::types::GLuint> {
         self.get(imgui_texture).copied()
     }
 }
-
+/// Get the GL enum representing the size of the ImGui [`DrawIdx`].
 const fn imgui_index_type_as_gl() -> u32 {
     match size_of::<DrawIdx>() {
         1 => gl::UNSIGNED_BYTE,
@@ -94,6 +113,8 @@ const fn imgui_index_type_as_gl() -> u32 {
         _ => gl::UNSIGNED_INT,
     }
 }
+
+#[allow(clippy::missing_docs_in_private_items)]
 impl ImguiRenderer {
     pub fn new(imgui_context: &mut Context) -> Self {
         let mut imgui_texture_map = Textures::new();
@@ -129,7 +150,7 @@ impl ImguiRenderer {
             ebo_handle,
         }
     }
-    pub fn pre_render(&mut self, data: &DrawData, frame_width: f32, frame_height: f32) {
+    fn pre_render(&mut self, data: &DrawData, frame_width: f32, frame_height: f32) {
         unsafe {
             gl::ActiveTexture(gl::TEXTURE0);
             gl::Enable(gl::BLEND);
@@ -326,16 +347,24 @@ impl ImguiRenderer {
     }
 }
 
+/// Shaders and locations of their variables, necessary to render ImGui UI to the OpenGL context.
 struct Shaders {
+    /// The program to be bound on rendering.
     program: Program,
+    /// The location of the font atlas texture.
     texture_uniform_location: gl::types::GLint,
+    /// The location of the ImGui matrix.
     matrix_uniform_location: gl::types::GLint,
+    /// The location of the position attribute.
     position_attribute_index: gl::types::GLuint,
+    /// The location of the texture UV attribute.
     uv_attribute_index: gl::types::GLuint,
+    /// The location of the color attribute.
     color_attribute_index: gl::types::GLuint,
 }
 
 impl Shaders {
+    /// Create a new [`Shaders`].
     fn new() -> Result<Self, ShaderError> {
         const VERTEX_BODY: &str = include_str!("../../glsl/imgui/vert.glsl");
         const FRAGMENT_BODY: &str = include_str!("../../glsl/imgui/frag.glsl");
@@ -378,7 +407,9 @@ impl Shaders {
     }
 }
 
+/// Errors from creating a [`Shaders`] struct.
 #[derive(Debug)]
+#[allow(clippy::missing_docs_in_private_items)]
 pub enum ShaderError {
     IncompatibleVersion(String),
     CreateShader(String),
@@ -417,7 +448,9 @@ impl Display for ShaderError {
     }
 }
 
+/// Errors that may arise from creating the font atlas texture.
 #[derive(Debug)]
+#[allow(clippy::missing_docs_in_private_items)]
 pub enum InitError {
     Shader(ShaderError),
     CreateBufferObject(String),
@@ -426,6 +459,7 @@ pub enum InitError {
     UserError(String),
 }
 
+/// Create the font atlas texture in OpenGL and return its index.
 fn prepare_font_atlas<T: TextureMap>(
     fonts: &mut FontAtlas,
     texture_map: &mut T,
@@ -439,12 +473,13 @@ fn prepare_font_atlas<T: TextureMap>(
         let mut tex_id: gl::types::GLuint = 0;
         gl::GenTextures(1, &mut tex_id);
         if tex_id == 0 {
-            Err(String::from("Unable to create Texture object"))
+            Err(InitError::CreateTexture(String::from(
+                "Unable to create Texture object",
+            )))
         } else {
             Ok(tex_id)
         }
-    }
-    .map_err(InitError::CreateTexture)?;
+    }?;
 
     unsafe {
         gl::BindTexture(gl::TEXTURE_2D, gl_texture);
@@ -470,6 +505,8 @@ fn prepare_font_atlas<T: TextureMap>(
     Ok(gl_texture)
 }
 
+/// Calculate the matrix to map positions to for rendering ImGui elements.
+// allow() because otherwise rust yells at us that attrs on expressions are experimental
 #[allow(clippy::deprecated_cfg_attr)]
 fn calculate_matrix(draw_data: &DrawData, clip_origin_is_lower_left: bool) -> [f32; 16] {
     let left = draw_data.display_pos[0];
