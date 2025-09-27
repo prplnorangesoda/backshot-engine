@@ -4,7 +4,6 @@
 #![allow(incomplete_features)]
 #[cfg(doc)]
 compile_error!("rustdoc does not support generic const expressions");
-
 use std::{
     ffi::CStr,
     ops::Deref,

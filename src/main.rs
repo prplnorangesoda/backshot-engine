@@ -14,15 +14,7 @@
 extern crate render;
 extern crate world;
 
-use std::{
-    ffi::{CStr, c_char, c_void},
-    fs::File,
-    io::{self, Write},
-    ptr::null,
-    thread,
-    time::{Duration, Instant},
-};
-
+use anyhow::{Context as _, Result, format_err};
 use render::{
     Camera, Render, ScreenSpaceMesh, gl, gl_upd_viewport,
     imgui::{self, Context},
@@ -33,6 +25,14 @@ use sdl2::{
     event::WindowEvent,
     keyboard::Keycode,
     video::{self, GLContext},
+};
+use std::{
+    ffi::{CStr, c_char, c_void},
+    fs::File,
+    io::{self, Write},
+    ptr::null,
+    thread,
+    time::{Duration, Instant},
 };
 
 mod map;
@@ -97,29 +97,33 @@ extern "system" fn gl_debug_output(
     eprintln!("Debug output called. \n{type_str}\nMessage: {message_str}");
 }
 
-fn main() {
-    let (_sdl_ctx, video_ctx, mut event_pump) = init_sdl().unwrap();
+fn main() -> Result<()> {
+    let (_sdl_ctx, video_ctx, mut event_pump) = init_sdl()?;
 
-    let (window, main_id, gl_ctx) = make_main_window(&video_ctx).unwrap();
+    let (window, main_id, gl_ctx) = make_main_window(&video_ctx).map_err(|e| format_err!(e))?;
 
     // setup gl loading with sdl
     gl::load_with(|s| video_ctx.gl_get_proc_address(s).cast());
 
     let mut s = String::with_capacity(64);
-    print!("map: ");
-    io::stdout().flush().unwrap();
-    io::stdin().read_line(&mut s).unwrap();
+
+    // print!("map: ");
+    // io::stdout().flush()?;
+    // io::stdin().read_line(&mut s)?;
 
     s.pop();
-
-    let map_file = File::open(format!("maps/{}.map", s)).unwrap();
-    let map_data = parse_map(map_file).unwrap();
+    s.push_str("test");
+    let map = format!("maps/{}.map", s);
+    let map_file = File::open(&map)?;
+    let map_data = parse_map(map_file).context(map)?;
     gl_upd_viewport(START_WIDTH, START_HEIGHT);
     gl_setup();
 
     let mut render_ctx = Render::init(&gl_ctx);
 
-    render_ctx.clear().unwrap();
+    render_ctx
+        .clear()
+        .map_err(|_| format_err!("Error clearing screen"))?;
     window.gl_swap_window();
 
     let (mut imgui, mut imgui_platform, mut imgui_renderer) = imgui_create();
@@ -155,16 +159,20 @@ fn main() {
                     window_id,
                     win_event: WindowEvent::Resized(width, height),
                 } if window_id == main_id => {
-                    frame_width = width.try_into().unwrap();
-                    frame_height = height.try_into().unwrap();
+                    frame_width = width.try_into()?;
+                    frame_height = height.try_into()?;
                 }
                 _ => {}
             }
         }
 
         gl_upd_viewport(frame_width, frame_height);
-        render_ctx.clear().unwrap();
-        render_ctx.render_world(&screen_world).unwrap();
+        render_ctx
+            .clear()
+            .map_err(|_| format_err!("Error clearing screen"))?;
+        render_ctx
+            .render_world(&screen_world)
+            .map_err(|_| format_err!("Error rendering world"))?;
 
         imgui_platform.prepare_frame(&mut imgui, &window, &event_pump);
         let frame = imgui.new_frame();
@@ -199,6 +207,7 @@ fn main() {
             .duration_since(instant_loop_start)
             .as_secs_f64();
     }
+    Ok(())
 }
 
 /// Setup all the things that we need for this opengl context.
@@ -245,11 +254,13 @@ fn gl_setup() {
 }
 
 /// Initialize all values necessary for SDL.
-fn init_sdl() -> Result<(Sdl, VideoSubsystem, EventPump), String> {
-    let sdl_ctx = sdl2::init()?;
+fn init_sdl() -> Result<(Sdl, VideoSubsystem, EventPump)> {
+    let sdl_ctx = sdl2::init().map_err(|e| format_err!(e))?;
 
-    let video_ctx = sdl_ctx.video()?;
-    video_ctx.gl_load_library_default()?;
+    let video_ctx = sdl_ctx.video().map_err(|e| format_err!(e))?;
+    video_ctx
+        .gl_load_library_default()
+        .map_err(|e| format_err!(e))?;
 
     video_ctx
         .gl_attr()
@@ -267,7 +278,7 @@ fn init_sdl() -> Result<(Sdl, VideoSubsystem, EventPump), String> {
         .gl_attr()
         .set_context_profile(video::GLProfile::Core);
 
-    let event_pump = sdl_ctx.event_pump()?;
+    let event_pump = sdl_ctx.event_pump().map_err(|e| format_err!(e))?;
 
     Ok((sdl_ctx, video_ctx, event_pump))
 }
