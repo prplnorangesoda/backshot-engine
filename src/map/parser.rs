@@ -1,20 +1,17 @@
 //! Exports [`parse_map`].
 #![allow(clippy::missing_docs_in_private_items)] // TODO: remove this
 use std::{
-    borrow::Cow,
     cmp::min,
     io::{self, Read},
 };
 
 use render::glm::vec3;
 use thiserror::Error;
-use world::{
-    Vertex,
-    brush::{BrushPlane, NGonPlane, TriPlane},
-};
+use world::Vertex;
 
 /// It is guaranteed that all `PlaneDatas`
 /// have 3+ vertices.
+#[derive(Debug)]
 pub struct PlaneData {
     verts: Box<[Vertex]>,
 }
@@ -330,6 +327,11 @@ fn parse_brush_data(
         "can't deal with non positive signed input yet"
     );
     let mut ptr: usize = 0;
+
+    // uuuuuuuugghhh off by ones because we don't instantly call
+    // iter.next()
+    // hacky solution
+    let mut off_by_one_was_prevented = false;
     let mut iter = buf.iter().cloned();
 
     macro_rules! next {
@@ -338,8 +340,15 @@ fn parse_brush_data(
             let next = iter.next();
             match next {
                 Some(byte) => {
-                    ptr += 1;
-                    dbg!(byte as char);
+                    if off_by_one_was_prevented {
+                        ptr += 1;
+                    } else {
+                        off_by_one_was_prevented = true;
+                    }
+                    #[cfg(feature = "parser_debug")]
+                    {
+                        dbg!(byte as char);
+                    }
                     byte
                 },
                 None => {
@@ -350,20 +359,33 @@ fn parse_brush_data(
     }
 
     let mut planes = vec![];
-    'plane: loop {
-        let vertices = vec![];
+    'planes: loop {
+        let mut vertices = vec![];
+        let mut found_newline = false;
         'parsing_vertex: loop {
-            let mut nums = vec![];
+            if found_newline {
+                eprintln!("broke on newline in the last loop, breaking early");
+                err_ctx.line_count += 1;
+                break 'parsing_vertex;
+            }
             if is_comment(buf, ptr) {
                 // loop until newline
-                eprintln!("'parsing_vertex: is_comment true, looping till newline");
+                if cfg!(feature = "parser_debug") {
+                    eprintln!("'parsing_vertex: is_comment true, looping till newline");
+                }
                 while next!() != b'\n' {}
-                eprintln!("matched, stopping");
+                if cfg!(feature = "parser_debug") {
+                    eprintln!("matched, stopping and skipping");
+                }
                 err_ctx.line_count += 1;
+                // avoid reparsing if theres two comments in a row
+                continue 'parsing_vertex;
             }
+            let mut nums = vec![];
             'nums_loop: for _i in 0..3 {
-                eprintln!("'nums_loop: iteration {_i}");
-                let old_ptr = ptr;
+                if cfg!(feature = "parser_debug") {
+                    eprintln!("'nums_loop: iteration {_i}");
+                }
                 match next!() {
                     b'+' => (),
                     b'-' => (),
@@ -372,42 +394,54 @@ fn parse_brush_data(
                         break 'parsing_vertex;
                     }
                     b => {
-                        if is_comment(buf, ptr) {
-                            // loop until newline
-                            while next!() != b'\n' {}
-                            err_ctx.line_count += 1;
-                        }
                         return Err(err_ctx.bad_input(format!(
-                        "expected positive or negative sign to begin vertex number set part, or newline to end set, got \"{}\"",
-                        b as char
-                    )));
+                            "expected positive or negative sign to begin vertex number set part, or newline to end set, got \"{}\"",
+                            b as char
+                        )));
                     }
                 }
+                let old_ptr = ptr;
                 'reading_num: loop {
                     let b = next!();
                     if b == b' ' {
                         break 'reading_num;
                     }
+                    if b == b'\n' {
+                        found_newline = true;
+                        break 'reading_num;
+                    }
                     if !b.is_ascii_digit() && b != b'.' {
-                        return Err(err_ctx.bad_input(
-                            "expected parsable float values, found \"{b}\"".to_string(),
-                        ));
+                        return Err(err_ctx.bad_input(format!(
+                            "expected parsable float values, found \"{}\"",
+                            b as char
+                        )));
                     }
                 }
-                let num_str = str::from_utf8(&buf[old_ptr..ptr - 1])
+                let num_str = str::from_utf8(&buf[old_ptr..ptr])
                     .expect("ascii digits should make valid utf8");
+                if cfg!(feature = "parser_debug") {
+                    dbg!(num_str);
+                }
                 let num: f32 = num_str.parse().map_err(|err| {
                     err_ctx.bad_input(format!(
-                        "failed parsing number: {err:?} (num_str: {num_str}"
+                        "failed parsing number: {err:?} (num_str: {num_str})"
                     ))
                 })?;
-                dbg!(num);
+                if cfg!(feature = "parser_debug") {
+                    dbg!(num);
+                }
                 nums.push(num);
                 // BELOW UNNECESSARY: we skip the space naturally doing next!() on the next loop
                 // // skip over space
                 // next!();
             }
-            eprintln!("end of nums loop")
+            let vertex = Vertex {
+                pos: vec3(nums[0], nums[1], nums[2]),
+            };
+            if cfg!(feature = "parser_debug") {
+                eprintln!("end of nums loop, vertex: {:?}", vertex);
+            }
+            vertices.push(vertex);
         }
         let plane = match vertices.len() {
             len @ ..3 => {
@@ -415,16 +449,21 @@ fn parse_brush_data(
                     "vertices count too small! expected 3 or more, parsed {len}"
                 )));
             }
-            3 => BrushPlane::Triangle(TriPlane(vertices.try_into().unwrap())),
-            4.. => BrushPlane::NGon(NGonPlane(vertices.into_boxed_slice())),
+            3.. => PlaneData {
+                verts: vertices.into_boxed_slice(),
+            },
         };
         planes.push(plane);
+        // skip over the newline
+        if (next!() == b'e') {
+            break 'planes;
+        }
     }
-    // read_until_byte(buf, &mut ptr, b'e')?;
-
+    // skip over 'e' byte
+    next!();
     Ok((
         BrushData {
-            planes: Box::new([]),
+            planes: planes.into_boxed_slice(),
         },
         ptr,
     ))
@@ -450,8 +489,10 @@ fn parse_brushes_save_leftovers(
             Some(byte) => *byte,
             None => break 'parse,
         };
-        dbg!(byte as char);
-        dbg!(ptr);
+        if cfg!(feature = "parser_debug") {
+            dbg!(byte as char);
+            dbg!(ptr);
+        }
         if byte == b'\n' {
             eprintln!("reached newline");
             // we're at a new line, skip to parsable byte
@@ -486,8 +527,9 @@ fn parse_brushes_save_leftovers(
 
 fn is_comment(buf: &[u8], ptr: usize) -> bool {
     // if we're running in debug mode, print extra information to aid debugging
-    if cfg!(debug_assertions) {
-        let neighbourhood = &buf[ptr.saturating_sub(5)..ptr.saturating_add(6)];
+    if cfg!(feature = "parser_debug") {
+        let len = buf.len();
+        let neighbourhood = &buf[ptr.saturating_sub(5)..ptr.saturating_add(6).clamp(0, len)];
 
         let mut sanitized_neighbors = vec![];
         for byte in neighbourhood.iter().cloned() {
@@ -508,7 +550,12 @@ fn is_comment(buf: &[u8], ptr: usize) -> bool {
         eprintln!("ptr neighborhood: \n'{neighborhood_string}'\n",);
     }
 
-    dbg!(buf.get(ptr).is_some_and(|b| *b == b'/') && buf.get(ptr + 1).is_some_and(|b| *b == b'/'))
+    let ret =
+        buf.get(ptr).is_some_and(|b| *b == b'/') && buf.get(ptr + 1).is_some_and(|b| *b == b'/');
+    if cfg!(feature = "parser_debug") {
+        dbg!(ret);
+    }
+    ret
 }
 
 /// Read an input with dynamic size,

@@ -1,3 +1,4 @@
+#![crate_type = "rlib"]
 #![allow(dead_code, clippy::let_and_return)]
 
 pub mod brush;

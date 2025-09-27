@@ -11,3 +11,6 @@ world = { path = "./world_crate" }
 sdl2 = { path = "./thirdparty/rust-sdl2" }
 thiserror = "2.0.16"
 anyhow = "1.0.100"
+
+[features]
+parser_debug = []

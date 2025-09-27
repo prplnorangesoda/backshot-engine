@@ -1,9 +1,11 @@
 //! The rendering arm of the engine.
+#![crate_type = "rlib"]
 #![allow(dead_code, clippy::let_and_return)]
 #![feature(generic_const_exprs, generic_const_items)]
 #![allow(incomplete_features)]
 #[cfg(doc)]
 compile_error!("rustdoc does not support generic const expressions");
+
 use std::{
     ffi::CStr,
     ops::Deref,
